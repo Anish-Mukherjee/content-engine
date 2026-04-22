@@ -1,4 +1,5 @@
 // src/stages/drive-article.ts
+import { env } from '../config/env';
 import { pickNextDrivable, getArticle, markFailed } from '../db/queries';
 import { logger } from '../lib/logger';
 import { notifyWebhook } from '../lib/webhook';
@@ -41,18 +42,18 @@ export async function driveArticle(): Promise<void> {
       await step.fn(article.id);
     } catch (err) {
       const failedStatus = `${step.name}_failed`;
+      const retryAfter = (fresh.retryCount ?? 0) + 1;
       await markFailed(article.id, failedStatus, err);
-      const nextRetryCount = (fresh.retryCount ?? 0) + 1;
       logger.error({ err, articleId: article.id, stage: step.name }, 'stage failed');
-      await notifyWebhook(process.env.WEBHOOK_URL, {
+      await notifyWebhook(env().WEBHOOK_URL, {
         event: 'stage_failed',
         articleId: article.id,
         keyword: article.keyword,
         stage: step.name,
         errorClass: err instanceof Error ? err.name : 'Error',
         errorMessage: err instanceof Error ? err.message : String(err),
-        retryCount: nextRetryCount,
-        willRetry: nextRetryCount < 3,
+        retryCount: retryAfter,
+        willRetry: retryAfter < 3,
       });
       return;
     }

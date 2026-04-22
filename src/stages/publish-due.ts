@@ -1,6 +1,7 @@
 // src/stages/publish-due.ts
 import { and, eq, lte } from 'drizzle-orm';
 
+import { env } from '../config/env';
 import { db } from '../db/client';
 import { articles } from '../db/schema';
 import { revalidate } from '../integrations/frontend';
@@ -27,7 +28,7 @@ export async function publishDue(): Promise<void> {
     }
 
     try {
-      const url = `${process.env.FRONTEND_BASE_URL}/blog/${slug}`;
+      const url = `${env().FRONTEND_BASE_URL}/blog/${slug}`;
       await submitUrl(url, 'URL_UPDATED');
     } catch (err) {
       logger.warn({ err, slug }, 'google indexing failed (soft-fail)');

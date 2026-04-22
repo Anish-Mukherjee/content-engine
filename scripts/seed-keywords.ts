@@ -1,4 +1,6 @@
 // scripts/seed-keywords.ts
+import 'dotenv/config';
+
 import { pathToFileURL } from 'node:url';
 import seeds from '../src/config/seed-keywords.json' with { type: 'json' };
 import { db, closeDb } from '../src/db/client';

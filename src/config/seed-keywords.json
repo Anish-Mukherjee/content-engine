@@ -1,0 +1,12 @@
+{
+  "exchanges":  ["Bybit futures trading", "Binance futures guide"],
+  "patterns":   ["crypto chart patterns", "head and shoulders crypto"],
+  "indicators": ["RSI crypto trading", "MACD crypto futures"],
+  "concepts":   ["crypto perpetual contracts", "crypto futures vs spot"],
+  "strategies": ["crypto scalping strategy", "breakout trading crypto"],
+  "automation": ["crypto trading bot", "automated crypto signals"],
+  "risk":       ["crypto position sizing", "stop loss crypto futures"],
+  "coins":      ["bitcoin futures trading", "ethereum futures analysis"],
+  "education":  ["crypto futures for beginners", "how to trade crypto futures"],
+  "analysis":   ["crypto technical analysis", "crypto market structure"]
+}

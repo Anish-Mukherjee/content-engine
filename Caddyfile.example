@@ -1,0 +1,22 @@
+# Caddyfile.example — copy the block below into /etc/caddy/Caddyfile on the VPS.
+# Do NOT replace the existing Caddyfile wholesale; append this block.
+
+pipeline.xerogravity.com {
+  reverse_proxy localhost:4000
+
+  encode gzip zstd
+
+  header {
+    X-Content-Type-Options nosniff
+    Referrer-Policy no-referrer-when-downgrade
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+  }
+
+  @images path /images/*
+  header @images Cache-Control "public, max-age=604800, immutable"
+
+  log {
+    output file /var/log/caddy/pipeline.log
+    format json
+  }
+}

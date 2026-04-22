@@ -1,4 +1,5 @@
 // scripts/seed-keywords.ts
+import { pathToFileURL } from 'node:url';
 import seeds from '../src/config/seed-keywords.json' with { type: 'json' };
 import { db, closeDb } from '../src/db/client';
 import { seedKeywords } from '../src/db/schema';
@@ -25,7 +26,7 @@ async function main() {
   await closeDb();
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((err) => {
     logger.error({ err }, 'seed import failed');
     process.exit(1);

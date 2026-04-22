@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "uniq_seed_kw_cat" ON "seed_keywords" USING btree ("keyword","category");

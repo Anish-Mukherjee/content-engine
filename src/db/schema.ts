@@ -12,6 +12,7 @@ export const seedKeywords = pgTable('seed_keywords', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
 }, (t) => ({
   idxSeedRotation: index('idx_seed_rotation').on(t.category, t.lastUsedAt),
+  uniqKeywordCategory: uniqueIndex('uniq_seed_kw_cat').on(t.keyword, t.category),
 }));
 
 export const dataforseoTasks = pgTable('dataforseo_tasks', {

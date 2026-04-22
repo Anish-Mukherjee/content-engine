@@ -1,0 +1,10 @@
+node_modules/
+dist/
+logs/
+*.log
+.env
+.env.local
+google-service-account.json
+storage/images/*.jpg
+!storage/images/fallbacks/*.jpg
+.DS_Store

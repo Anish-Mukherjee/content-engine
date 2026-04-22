@@ -1,5 +1,4 @@
 // src/db/queries.test.ts
-import 'dotenv/config';
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import { sql } from 'drizzle-orm';
 import { db, closeDb } from './client';

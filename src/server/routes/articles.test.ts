@@ -52,6 +52,28 @@ describe('articles routes', () => {
     expect((await request(app).get('/api/articles/nope')).status).toBe(404);
   });
 
+  it('GET /api/articles?category= filters by category and ignores invalid values', async () => {
+    await db().insert(articles).values([
+      { keyword: 'a', category: 'exchanges', status: 'published', slug: 'a', publishedAt: new Date() },
+      { keyword: 'b', category: 'funding-rates', status: 'published', slug: 'b', publishedAt: new Date() },
+    ]);
+    const valid = await request(app).get('/api/articles?category=exchanges');
+    expect(valid.status).toBe(200);
+    expect(valid.body.articles).toHaveLength(1);
+    expect(valid.body.articles[0].slug).toBe('a');
+
+    const invalid = await request(app).get('/api/articles?category=not-a-category');
+    expect(invalid.status).toBe(200);
+    expect(invalid.body.articles).toHaveLength(2);  // falls back to all published
+  });
+
+  it('GET /api/articles with non-numeric pagination params returns 200 with defaults', async () => {
+    const res = await request(app).get('/api/articles?page=foo&limit=bar');
+    expect(res.status).toBe(200);
+    expect(res.body.page).toBe(1);
+    expect(res.body.limit).toBe(20);
+  });
+
   it('GET /api/sitemap-data returns slug + publishedAt + updatedAt', async () => {
     await db().insert(articles).values({
       keyword: 'k', category: 'exchanges', status: 'published', slug: 's',

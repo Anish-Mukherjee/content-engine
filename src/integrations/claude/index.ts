@@ -107,9 +107,11 @@ function tryJson(raw: string): unknown {
   }
 }
 
-// Rate-limit 429 handling: Anthropic SDK throws errors with .status.
-// Wrap specific calls in the driver; we surface as TransientError.
+// Returns true for errors the driver should treat as transient and retry.
+// Covers: HTTP 429, HTTP 5xx, and Anthropic SDK connection/timeout errors.
 export function isTransientClaudeError(err: unknown): boolean {
+  const name = (err as { name?: string })?.name ?? '';
+  if (name === 'APIConnectionError' || name === 'APIConnectionTimeoutError') return true;
   const anyErr = err as { status?: number };
   return typeof anyErr.status === 'number' && (anyErr.status === 429 || anyErr.status >= 500);
 }

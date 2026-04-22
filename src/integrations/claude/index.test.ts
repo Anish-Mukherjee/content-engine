@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Anthropic from '@anthropic-ai/sdk';
 
-import { checkRelevance, generateOutline, writeArticleBody } from './index';
+import { checkRelevance, generateOutline, writeArticleBody, isTransientClaudeError } from './index';
 import { BRAND } from '../../config/brand';
 
 vi.mock('@anthropic-ai/sdk');
@@ -71,5 +71,21 @@ describe('claude integration', () => {
     await expect(
       generateOutline({ id: '1', keyword: 'k', searchVolume: 100 } as any, { keyword: 'k' } as any, BRAND),
     ).rejects.toThrow(/json/i);
+  });
+
+  it('isTransientClaudeError detects APIConnectionError by name', () => {
+    const err = new Error('connection lost');
+    err.name = 'APIConnectionError';
+    expect(isTransientClaudeError(err)).toBe(true);
+
+    const timeoutErr = new Error('timeout');
+    timeoutErr.name = 'APIConnectionTimeoutError';
+    expect(isTransientClaudeError(timeoutErr)).toBe(true);
+
+    const rateLimit = { status: 429 };
+    expect(isTransientClaudeError(rateLimit)).toBe(true);
+
+    const plainErr = new Error('some other error');
+    expect(isTransientClaudeError(plainErr)).toBe(false);
   });
 });

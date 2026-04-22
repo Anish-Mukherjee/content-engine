@@ -38,7 +38,10 @@ export async function searchHeroImage(category: Category): Promise<UnsplashPhoto
 }
 
 export async function downloadAndCrop(photo: UnsplashPhoto, slug: string): Promise<LocalImage> {
-  const buf = await downloadBytes(photo.urlRaw + '&w=2000&q=80');
+  const target = new URL(photo.urlRaw);
+  target.searchParams.set('w', '2000');
+  target.searchParams.set('q', '80');
+  const buf = await downloadBytes(target.toString());
   const cropped = await sharp(Buffer.from(buf))
     .resize(1200, 630, { fit: 'cover', position: 'centre' })
     .jpeg({ quality: 85 })

@@ -17,7 +17,10 @@ const schema = z.object({
   FRONTEND_REVALIDATE_SECRET: z.string().min(1),
 
   ADMIN_API_KEY: z.string().min(1),
-  WEBHOOK_URL: z.string().url().optional(),
+  WEBHOOK_URL: z
+    .union([z.string().url(), z.literal('')])
+    .optional()
+    .transform((v) => (v === '' ? undefined : v)),
 
   PUBLISH_HOUR_UTC: z.coerce.number().int().min(0).max(23).default(9),
   DISABLE_CRON: z

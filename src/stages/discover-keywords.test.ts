@@ -41,9 +41,14 @@ describe('discoverKeywords', () => {
     expect(used).toHaveLength(25);
   });
 
-  it('returns early with warning when not enough seeds available in a category', async () => {
-    // Only one "exchanges" seed, need 3
+  it('takes what is available when a category is under-seeded', async () => {
+    // Only one "exchanges" seed, rotation asks for 3 — should warn and submit just 1 for that category
     await db().insert(seedKeywords).values({ keyword: 'only-one', category: 'exchanges' });
-    await expect(discoverKeywords()).rejects.toThrow(/insufficient seeds/i);
+    (submitKeywordTask as unknown as vi.Mock).mockImplementation(async (kw: string) =>
+      ({ externalTaskId: `task-${kw}` }));
+
+    await discoverKeywords();
+    const tasks = await db().select().from(dataforseoTasks);
+    expect(tasks.length).toBeGreaterThanOrEqual(1);
   });
 });

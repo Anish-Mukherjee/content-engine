@@ -20,8 +20,9 @@ export async function discoverKeywords(): Promise<void> {
       .orderBy(asc(sql`COALESCE(${seedKeywords.lastUsedAt}, '1970-01-01'::timestamp)`), asc(seedKeywords.createdAt))
       .limit(need);
     if (rows.length < need) {
-      throw new Error(
-        `insufficient seeds in category "${category}": have ${rows.length}, need ${need}`,
+      logger.warn(
+        { category, have: rows.length, need },
+        'under-seeded category — submitting what is available',
       );
     }
     for (const r of rows) selected.push({ id: r.id, keyword: r.keyword, category });

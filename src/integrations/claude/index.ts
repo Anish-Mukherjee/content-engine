@@ -29,10 +29,16 @@ export async function checkRelevance(
   });
   const text = extractText(resp);
   const arr = tryJson(text);
-  if (!Array.isArray(arr) || arr.length !== keywords.length) {
-    throw new TerminalError('claude relevance: array length mismatch');
+  if (!Array.isArray(arr)) {
+    throw new TerminalError('claude relevance: response is not an array');
   }
-  return arr.map((v) => String(v).toUpperCase().startsWith('Y'));
+  // Tolerate length drift: if Claude returns fewer items, missing ones default to
+  // "not approved" (safe). If it returns more, ignore the overflow.
+  const verdicts: boolean[] = [];
+  for (let i = 0; i < keywords.length; i++) {
+    verdicts.push(i < arr.length ? String(arr[i]).toUpperCase().startsWith('Y') : false);
+  }
+  return verdicts;
 }
 
 export async function generateOutline(
@@ -99,7 +105,16 @@ function extractText(resp: { content: Array<{ type: string; text?: string }> }):
 }
 
 function tryJson(raw: string): unknown {
-  const cleaned = raw.replace(/^\s*```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+  // First pass: strip markdown code fence wrappers if present.
+  let cleaned = raw.replace(/^\s*```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+
+  // Second pass: if Claude prefaced or trailed the JSON with prose, extract the
+  // first {...} or [...] block.
+  if (cleaned && cleaned[0] !== '{' && cleaned[0] !== '[') {
+    const match = cleaned.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+    if (match) cleaned = match[1];
+  }
+
   try {
     return JSON.parse(cleaned);
   } catch {

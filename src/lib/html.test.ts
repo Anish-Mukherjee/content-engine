@@ -4,10 +4,19 @@ import { sanitizeArticleHtml, countWords, extractFaqSchema } from './html';
 
 describe('html helpers', () => {
   it('sanitizeArticleHtml strips script tags', () => {
-    const dirty = '<h1>Hi</h1><script>alert(1)</script><p>Body</p>';
+    const dirty = '<h2>Hi</h2><script>alert(1)</script><p>Body</p>';
     const out = sanitizeArticleHtml(dirty);
     expect(out).not.toContain('<script');
-    expect(out).toContain('<h1>Hi</h1>');
+    expect(out).toContain('<h2>Hi</h2>');
+    expect(out).toContain('<p>Body</p>');
+  });
+
+  it('sanitizeArticleHtml drops h1 tag AND its text (frame renders article title as H1)', () => {
+    const dirty = '<h1>Duplicate title</h1><h2>Real heading</h2><p>Body</p>';
+    const out = sanitizeArticleHtml(dirty);
+    expect(out).not.toContain('<h1');
+    expect(out).not.toContain('Duplicate title');
+    expect(out).toContain('<h2>Real heading</h2>');
     expect(out).toContain('<p>Body</p>');
   });
 

@@ -38,15 +38,19 @@ describe('writeArticle', () => {
     }).returning();
 
     const longBody = Array.from({ length: 300 }, (_, i) => `word${i}`).join(' ');
+    // Body intentionally starts with an <h1> — the sanitizer must strip it so the
+    // frame's <h1>{article.title}</h1> stays the sole H1 on the rendered page.
     (writeArticleBody as unknown as vi.Mock).mockResolvedValueOnce(
-      `<h1>Hello</h1><p>${longBody}</p><script>bad()</script>`,
+      `<h1>Duplicate title</h1><h2>Real heading</h2><p>${longBody}</p><script>bad()</script>`,
     );
 
     await writeArticle(a.id);
 
     const [row] = await db().select().from(articles).where(eq(articles.id, a.id));
     expect(row.status).toBe('written');
-    expect(row.articleHtml).toContain('<h1>Hello</h1>');
+    expect(row.articleHtml).not.toContain('<h1');
+    expect(row.articleHtml).not.toContain('Duplicate title');
+    expect(row.articleHtml).toContain('<h2>Real heading</h2>');
     expect(row.articleHtml).not.toContain('<script');
     expect(row.wordCount).toBeGreaterThanOrEqual(200);
     expect(row.faqSchema).toBeDefined();

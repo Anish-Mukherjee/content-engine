@@ -5,7 +5,12 @@ const ALLOWED_CLASSES = ['faq-section', 'faq-item', 'faq-question', 'faq-answer'
 
 export function sanitizeArticleHtml(html: string): string {
   return sanitizeHtml(html, {
-    allowedTags: ['h1', 'h2', 'h3', 'p', 'ul', 'ol', 'li', 'strong', 'em', 'a', 'div'],
+    // h1 is intentionally excluded — the page frame renders the article title as <h1>,
+    // body content starts at h2. h1 is listed in `nonTextTags` below so both the
+    // tag and its text content are discarded (not left as loose text).
+    allowedTags: ['h2', 'h3', 'p', 'ul', 'ol', 'li', 'strong', 'em', 'a', 'div'],
+    // Preserves sanitize-html defaults (style/script/textarea/option) plus h1.
+    nonTextTags: ['style', 'script', 'textarea', 'option', 'noscript', 'h1'],
     allowedAttributes: {
       a: ['href', 'target', 'rel'],
       div: ['class'],

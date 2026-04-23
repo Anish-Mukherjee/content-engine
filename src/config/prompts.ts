@@ -70,7 +70,6 @@ Return ONLY a JSON object with this exact structure:
   "search_intent": "informational|commercial|navigational",
   "word_count": 1400,
   "outline": {
-    "h1": "article H1 heading",
     "introduction": "2 sentence summary of what the intro covers",
     "sections": [
       { "h2": "Section heading", "summary": "what this section covers in 1 sentence",
@@ -98,7 +97,7 @@ Writing rules:
 - Never use filler phrases like "in conclusion" or "it is worth noting"
 - Always back claims with specific examples or numbers
 - Naturally mention ${brand.name} once or twice where relevant — never forced
-- Include the primary keyword in H1, first paragraph, and at least 2 H2s
+- Include the primary keyword in the first paragraph and at least 2 H2s
 - Include secondary keywords naturally throughout
 - Every H2 section should be meaty and valuable
 - FAQ answers must be concise — 2-3 sentences max
@@ -137,8 +136,7 @@ CTA block to insert at indicated location (inline exactly as given):
 ${params.ctaHtml}
 
 Return the complete article as clean HTML using these exact tags only:
-- <h1> for main title
-- <h2> for section headings
+- <h2> for section headings (start the article with the first H2 — the page frame renders the article title as H1)
 - <h3> for subsections
 - <p> for paragraphs
 - <ul> and <li> for lists
@@ -149,5 +147,5 @@ Return the complete article as clean HTML using these exact tags only:
 - <div class="faq-answer"> for each answer
 - <div class="xg-cta"> for the CTA block
 
-Do not include <html>, <head>, <body> or any wrapper tags. Start directly with <h1>.`;
+Do not include <html>, <head>, <body>, <h1>, or any wrapper tags. Start directly with an opening paragraph or <h2>.`;
 }

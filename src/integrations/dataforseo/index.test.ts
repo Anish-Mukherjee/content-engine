@@ -44,20 +44,22 @@ describe('dataforseo integration', () => {
   });
 
   it('fetchTaskResult parses keyword data when complete', async () => {
+    // DataForSEO keywords_for_keywords returns `result` as a flat array of
+    // keyword rows (not nested under `items`). `competition` is a string
+    // ("LOW"/"MEDIUM"/"HIGH"); the numeric equivalent is `competition_index` (0–100).
     fetchMock.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
           tasks: [{
             status_code: 20000,
             result: [{
-              items: [{
-                keyword: 'bybit futures',
-                search_volume: 2400,
-                competition: 0.45,
-                cpc: 1.8,
-                keyword_difficulty: 38,
-                trend: 'growing',
-              }],
+              keyword: 'bybit futures',
+              search_volume: 2400,
+              competition: 'MEDIUM',
+              competition_index: 45,
+              cpc: 1.8,
+              keyword_difficulty: 38,
+              trend: 'growing',
             }],
           }],
         }),

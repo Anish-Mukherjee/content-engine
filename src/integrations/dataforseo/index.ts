@@ -27,20 +27,24 @@ export async function fetchTaskResult(
   ) as {
     tasks?: Array<{
       status_code?: number;
-      result?: Array<{ items?: unknown[] }>;
+      result?: unknown[];
     }>;
   };
   const task = resp.tasks?.[0];
   const code = task?.status_code ?? 0;
   if (!task || INCOMPLETE_CODES.has(code)) return { complete: false };
 
-  const items = task.result?.[0]?.items ?? [];
+  const items = task.result ?? [];
   const results: KeywordData[] = items.map((raw) => {
     const r = raw as Record<string, unknown>;
+    // DataForSEO returns competition as "LOW"/"MEDIUM"/"HIGH" and competition_index 0–100.
+    // Normalize to the 0–1 range that our FILTERS.max_competition threshold expects.
+    const rawIdx = typeof r.competition_index === 'number' ? r.competition_index : null;
+    const normalizedCompetition = rawIdx !== null ? rawIdx / 100 : null;
     return {
       keyword: String(r.keyword ?? ''),
       searchVolume: typeof r.search_volume === 'number' ? r.search_volume : null,
-      competition: typeof r.competition === 'number' ? r.competition : null,
+      competition: normalizedCompetition,
       cpc: typeof r.cpc === 'number' ? r.cpc : null,
       keywordDifficulty: typeof r.keyword_difficulty === 'number' ? r.keyword_difficulty : null,
       trend: typeof r.trend === 'string' ? r.trend : null,

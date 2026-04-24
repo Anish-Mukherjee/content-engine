@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { researchKeyword } from './index';
 import { BRAND } from '../../config/brand';
+import type { PerplexityBrief } from './types';
 
 describe('perplexity integration', () => {
   const fetchMock = vi.fn();
@@ -23,29 +24,44 @@ describe('perplexity integration', () => {
     );
   }
 
-  it('parses a valid JSON brief', async () => {
-    const brief = {
+  function validBrief(overrides: Partial<PerplexityBrief> = {}): PerplexityBrief {
+    return {
       keyword: 'Bybit futures',
       search_intent: 'informational',
       target_audience: 'traders',
-      top_questions: [], trending_angles: [], content_gaps: [],
-      recent_developments: [], competitor_titles: [],
-      recommended_title: 't', recommended_h2s: [], key_terms_to_include: [],
-      word_count_recommendation: 1200,
+      top_3_competitors: [
+        { title: 'A', url: 'https://a.example', strengths: ['s'], weaknesses: ['w'], word_count: 1200, tone: 'neutral' },
+        { title: 'B', url: 'https://b.example', strengths: ['s'], weaknesses: ['w'], word_count: 1400, tone: 'neutral' },
+        { title: 'C', url: 'https://c.example', strengths: ['s'], weaknesses: ['w'], word_count: 1100, tone: 'neutral' },
+      ],
+      winning_angle: 'beat them',
+      unique_hook: 'the hook',
+      content_gaps: ['g1', 'g2', 'g3'],
+      questions_to_answer: ['q1', 'q2', 'q3', 'q4', 'q5'],
+      key_stats_to_include: ['stat1', 'stat2'],
+      recommended_tone: 'direct',
+      recommended_title: 'Great Title',
+      recommended_h2s: ['h1', 'h2', 'h3', 'h4', 'h5'],
+      key_terms_to_include: ['t1', 't2', 't3', 't4', 't5'],
+      word_count_recommendation: 1400,
+      faq_questions: ['f1', 'f2', 'f3'],
+      ...overrides,
     };
+  }
+
+  it('parses a valid JSON brief', async () => {
+    const brief = validBrief();
     fetchMock.mockResolvedValueOnce(briefResponse(JSON.stringify(brief)));
 
     const result = await researchKeyword('Bybit futures', BRAND);
     expect(result.keyword).toBe('Bybit futures');
-    expect(result.word_count_recommendation).toBe(1200);
+    expect(result.word_count_recommendation).toBe(1400);
+    expect(result.top_3_competitors).toHaveLength(3);
+    expect(result.winning_angle).toBe('beat them');
   });
 
   it('retries once with a stricter reprompt when JSON parsing fails, then succeeds', async () => {
-    const brief = { keyword: 'x', search_intent: 'informational', target_audience: '',
-      top_questions: [], trending_angles: [], content_gaps: [],
-      recent_developments: [], competitor_titles: [],
-      recommended_title: '', recommended_h2s: [], key_terms_to_include: [],
-      word_count_recommendation: 1200 };
+    const brief = validBrief({ keyword: 'x' });
     fetchMock
       .mockResolvedValueOnce(briefResponse('Here is the brief: ```json\n{not valid}\n```'))
       .mockResolvedValueOnce(briefResponse(JSON.stringify(brief)));
@@ -60,5 +76,13 @@ describe('perplexity integration', () => {
       .mockResolvedValueOnce(briefResponse('not json'))
       .mockResolvedValueOnce(briefResponse('still not json'));
     await expect(researchKeyword('x', BRAND)).rejects.toThrow(/json/i);
+  });
+
+  it('throws TerminalError naming the missing field when a required field is absent', async () => {
+    const brief = validBrief();
+    const { winning_angle, ...partial } = brief;
+    void winning_angle;
+    fetchMock.mockResolvedValueOnce(briefResponse(JSON.stringify(partial)));
+    await expect(researchKeyword('x', BRAND)).rejects.toThrow(/winning_angle/);
   });
 });

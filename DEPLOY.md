@@ -49,6 +49,9 @@ npm run seed:keywords
 # 3. Secrets
 # Place google-service-account.json in /srv/content-pipeline/ (gitignored).
 # Ensure GOOGLE_SERVICE_ACCOUNT_JSON_PATH in .env points to it.
+#
+# Inline images use Openverse (anonymous, no key) with Wikimedia Commons as
+# fallback — no additional setup needed.
 
 # 4. Start (cron disabled for first hour)
 pm2 start ecosystem.config.cjs

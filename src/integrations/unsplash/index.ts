@@ -1,16 +1,12 @@
 // src/integrations/unsplash/index.ts
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
-import sharp from 'sharp';
-
 import type { Category } from '../../config/categories';
 import { CATEGORY_IMAGE_QUERY } from '../../config/categories';
-import { search, downloadBytes } from './client';
+import { downloadAndSave } from '../inline-images/download';
+import { search } from './client';
 import type { LocalImage, UnsplashPhoto } from './types';
 
-function storageDir(): string {
-  return process.env.STORAGE_DIR ?? path.resolve('storage');
-}
+const HERO_WIDTH = 1200;
+const HERO_HEIGHT = 630;
 
 export async function searchHeroImage(category: Category): Promise<UnsplashPhoto | null> {
   const query = CATEGORY_IMAGE_QUERY[category];
@@ -38,25 +34,19 @@ export async function searchHeroImage(category: Category): Promise<UnsplashPhoto
 }
 
 export async function downloadAndCrop(photo: UnsplashPhoto, slug: string): Promise<LocalImage> {
+  // Unsplash serves dynamic crops via raw URL params — request a 2000px wide
+  // master and let sharp re-crop locally. This avoids depending on Unsplash's
+  // crop heuristics for rectangle fit.
   const target = new URL(photo.urlRaw);
   target.searchParams.set('w', '2000');
   target.searchParams.set('q', '80');
-  const buf = await downloadBytes(target.toString());
-  const cropped = await sharp(Buffer.from(buf))
-    .resize(1200, 630, { fit: 'cover', position: 'centre' })
-    .jpeg({ quality: 85 })
-    .toBuffer();
-
-  const dir = path.join(storageDir(), 'images');
-  await fs.mkdir(dir, { recursive: true });
-  const filename = `${slug}-hero.jpg`;
-  await fs.writeFile(path.join(dir, filename), cropped);
+  const saved = await downloadAndSave(target.toString(), `${slug}-hero`, HERO_WIDTH, HERO_HEIGHT);
 
   return {
-    url: `/images/${filename}`,
+    url: saved.url,
     altText: photo.altText || slug,
-    width: 1200,
-    height: 630,
+    width: HERO_WIDTH,
+    height: HERO_HEIGHT,
     photographerName: photo.photographerName,
     photographerUrl: photo.photographerUrl,
     unsplashId: photo.id,
@@ -68,8 +58,8 @@ export function getFallbackImage(category: Category): LocalImage {
   return {
     url: `/images/fallbacks/${category}.jpg`,
     altText: `${category} crypto futures`,
-    width: 1200,
-    height: 630,
+    width: HERO_WIDTH,
+    height: HERO_HEIGHT,
     photographerName: null,
     photographerUrl: null,
     unsplashId: null,

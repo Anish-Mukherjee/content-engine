@@ -18,7 +18,21 @@ describe('outlineArticle', () => {
   it('stores outline + title + slug + meta + secondary keywords, advances to outlined', async () => {
     const [a] = await db().insert(articles).values({
       keyword: 'bybit futures guide', category: 'exchanges', status: 'researched',
-      perplexityBrief: { keyword: 'bybit futures guide' },
+      perplexityBrief: {
+        keyword: 'bybit futures guide',
+        search_intent: 'informational',
+        target_audience: 'traders',
+        top_3_competitors: [
+          { title: 'A', url: 'https://a', strengths: [], weaknesses: [], word_count: 1200, tone: 'neutral' },
+          { title: 'B', url: 'https://b', strengths: [], weaknesses: [], word_count: 1200, tone: 'neutral' },
+          { title: 'C', url: 'https://c', strengths: [], weaknesses: [], word_count: 1200, tone: 'neutral' },
+        ],
+        winning_angle: 'wa', unique_hook: 'uh',
+        content_gaps: [], questions_to_answer: [],
+        key_stats_to_include: [], recommended_tone: 'direct',
+        recommended_title: 'Bybit', recommended_h2s: [], key_terms_to_include: [],
+        word_count_recommendation: 1400, faq_questions: [],
+      },
     }).returning();
 
     (generateOutline as unknown as vi.Mock).mockResolvedValueOnce({

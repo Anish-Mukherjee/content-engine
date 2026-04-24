@@ -1,6 +1,9 @@
 // src/lib/html.test.ts
 import { describe, it, expect } from 'vitest';
-import { sanitizeArticleHtml, countWords, extractFaqSchema } from './html';
+import {
+  sanitizeArticleHtml, countWords, extractFaqSchema,
+  findInlineImagePlaceholders, replacePlaceholder,
+} from './html';
 
 describe('html helpers', () => {
   it('sanitizeArticleHtml strips script tags', () => {
@@ -39,6 +42,29 @@ describe('html helpers', () => {
     expect(out).not.toContain('evil-class');
   });
 
+  it('sanitizeArticleHtml preserves inline image placeholder with data-query and data-caption', () => {
+    const html = '<p>Intro.</p><div class="inline-image-placeholder" data-query="Bybit perpetual interface" data-caption="Bybit interface"></div><p>More.</p>';
+    const out = sanitizeArticleHtml(html);
+    expect(out).toContain('class="inline-image-placeholder"');
+    expect(out).toContain('data-query="Bybit perpetual interface"');
+    expect(out).toContain('data-caption="Bybit interface"');
+  });
+
+  it('sanitizeArticleHtml allows figure.article-image with img and figcaption', () => {
+    const html = '<figure class="article-image"><img src="https://cdn.example/p.jpg" alt="alt" width="800" height="450" loading="lazy" /><figcaption>caption — <a href="https://commons.wikimedia.org">Wikimedia</a> (CC)</figcaption></figure>';
+    const out = sanitizeArticleHtml(html);
+    expect(out).toContain('<figure class="article-image">');
+    expect(out).toContain('<img');
+    expect(out).toContain('src="https://cdn.example/p.jpg"');
+    expect(out).toContain('<figcaption>');
+  });
+
+  it('sanitizeArticleHtml rejects non-https image src', () => {
+    const html = '<figure class="article-image"><img src="javascript:alert(1)" alt="x" /></figure>';
+    const out = sanitizeArticleHtml(html);
+    expect(out).not.toContain('javascript:');
+  });
+
   it('countWords ignores HTML tags', () => {
     expect(countWords('<h1>One two three</h1><p>four five</p>')).toBe(5);
   });
@@ -67,5 +93,29 @@ describe('html helpers', () => {
 
   it('extractFaqSchema returns null when no FAQ items', () => {
     expect(extractFaqSchema('<p>no faq</p>')).toBeNull();
+  });
+
+  it('findInlineImagePlaceholders returns query+caption for every placeholder', () => {
+    const html = [
+      '<p>intro</p>',
+      '<div class="inline-image-placeholder" data-query="first query" data-caption="first caption"></div>',
+      '<p>mid</p>',
+      '<div class="inline-image-placeholder" data-query="second q" data-caption="second c"></div>',
+    ].join('');
+    const placeholders = findInlineImagePlaceholders(html);
+    expect(placeholders).toHaveLength(2);
+    expect(placeholders[0].query).toBe('first query');
+    expect(placeholders[0].caption).toBe('first caption');
+    expect(placeholders[1].query).toBe('second q');
+  });
+
+  it('replacePlaceholder substitutes the full match with the given HTML', () => {
+    const html = '<p>a</p><div class="inline-image-placeholder" data-query="q" data-caption="c"></div><p>b</p>';
+    const placeholders = findInlineImagePlaceholders(html);
+    const out = replacePlaceholder(html, placeholders[0], '<figure class="article-image"><img src="https://x/y.jpg" alt="c" /></figure>');
+    expect(out).toContain('<figure class="article-image">');
+    expect(out).not.toContain('inline-image-placeholder');
+    expect(out).toContain('<p>a</p>');
+    expect(out).toContain('<p>b</p>');
   });
 });

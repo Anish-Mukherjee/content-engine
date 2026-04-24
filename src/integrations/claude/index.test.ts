@@ -4,6 +4,32 @@ import Anthropic from '@anthropic-ai/sdk';
 
 import { checkRelevance, generateOutline, writeArticleBody, isTransientClaudeError } from './index';
 import { BRAND } from '../../config/brand';
+import type { PerplexityBrief } from '../perplexity/types';
+
+function stubBrief(overrides: Partial<PerplexityBrief> = {}): PerplexityBrief {
+  return {
+    keyword: 'k',
+    search_intent: 'informational',
+    target_audience: 'x',
+    top_3_competitors: [
+      { title: 'A', url: 'https://a', strengths: [], weaknesses: [], word_count: 1200, tone: 'neutral' },
+      { title: 'B', url: 'https://b', strengths: [], weaknesses: [], word_count: 1200, tone: 'neutral' },
+      { title: 'C', url: 'https://c', strengths: [], weaknesses: [], word_count: 1200, tone: 'neutral' },
+    ],
+    winning_angle: 'wa',
+    unique_hook: 'uh',
+    content_gaps: ['g'],
+    questions_to_answer: ['q'],
+    key_stats_to_include: ['s'],
+    recommended_tone: 't',
+    recommended_title: 'rt',
+    recommended_h2s: ['h2a'],
+    key_terms_to_include: ['t1'],
+    word_count_recommendation: 1200,
+    faq_questions: ['fq'],
+    ...overrides,
+  };
+}
 
 vi.mock('@anthropic-ai/sdk');
 
@@ -45,8 +71,8 @@ describe('claude integration', () => {
     };
     createMock.mockResolvedValueOnce(textResp(JSON.stringify(outline)));
     const result = await generateOutline(
-      { id: '1', keyword: 'k', searchVolume: 100 } as any,
-      { keyword: 'k' } as any,
+      { id: '1', keyword: 'k', searchVolume: 100 },
+      stubBrief(),
       BRAND,
     );
     expect(result.title).toBe('T');
@@ -56,10 +82,10 @@ describe('claude integration', () => {
   it('writeArticleBody returns HTML string and uses Opus model', async () => {
     createMock.mockResolvedValueOnce(textResp('<h1>Hello</h1><p>Body</p>'));
     const html = await writeArticleBody(
-      { keyword: 'k', secondaryKeywords: [] } as any,
+      { keyword: 'k', secondaryKeywords: [] },
       { word_count: 1200, search_intent: 'informational', target_audience: 'x', cta_placement: 'end',
         outline: { h1: '', introduction: '', sections: [], conclusion: '', faq: [] } } as any,
-      { key_terms_to_include: [], recent_developments: [] } as any,
+      stubBrief(),
       BRAND,
     );
     expect(html).toContain('<h1>Hello</h1>');
@@ -69,7 +95,7 @@ describe('claude integration', () => {
   it('generateOutline throws TerminalError on unparseable response', async () => {
     createMock.mockResolvedValueOnce(textResp('not json'));
     await expect(
-      generateOutline({ id: '1', keyword: 'k', searchVolume: 100 } as any, { keyword: 'k' } as any, BRAND),
+      generateOutline({ id: '1', keyword: 'k', searchVolume: 100 }, stubBrief(), BRAND),
     ).rejects.toThrow(/json/i);
   });
 

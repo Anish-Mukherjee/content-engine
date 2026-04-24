@@ -15,9 +15,3 @@ export async function search(query: string): Promise<unknown> {
   }
   return JSON.parse(body);
 }
-
-export async function downloadBytes(url: string): Promise<ArrayBuffer> {
-  const res = await fetch(url);
-  if (!res.ok) throw new TransientError(`unsplash image ${res.status}`);
-  return await res.arrayBuffer();
-}

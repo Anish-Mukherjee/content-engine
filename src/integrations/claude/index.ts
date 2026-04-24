@@ -7,6 +7,7 @@ import {
   claudeRelevanceSystem, claudeRelevanceUser,
 } from '../../config/prompts';
 import { TerminalError } from '../../lib/errors';
+import type { PerplexityBrief } from '../perplexity/types';
 import { anthropic } from './client';
 import type { ArticleOutline } from './types';
 
@@ -43,7 +44,7 @@ export async function checkRelevance(
 
 export async function generateOutline(
   article: ArticleRowShape,
-  brief: unknown,
+  brief: PerplexityBrief,
   brand: BrandConfig,
 ): Promise<ArticleOutline> {
   const resp = await anthropic().messages.create({
@@ -70,7 +71,7 @@ export async function generateOutline(
 export async function writeArticleBody(
   article: { keyword: string; secondaryKeywords: string[] | null },
   outline: ArticleOutline,
-  brief: { key_terms_to_include: string[]; recent_developments: string[] },
+  brief: PerplexityBrief,
   brand: BrandConfig,
 ): Promise<string> {
   const resp = await anthropic().messages.create({
@@ -82,7 +83,7 @@ export async function writeArticleBody(
       content: claudeArticleUser({
         keyword: article.keyword,
         secondaryKeywords: article.secondaryKeywords ?? [],
-        outline: outline.outline,
+        outline,
         brief,
         ctaPlacement: outline.cta_placement,
         ctaHtml: brand.ctaHtml,

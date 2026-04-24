@@ -10,7 +10,7 @@ import type { PerplexityBrief } from '../integrations/perplexity/types';
 import { TerminalError } from '../lib/errors';
 import { countWords, extractFaqSchema, sanitizeArticleHtml } from '../lib/html';
 
-const MIN_WORDS = 200;
+const MIN_WORDS = 1000;
 
 export async function writeArticle(articleId: string): Promise<void> {
   const [article] = await db().select().from(articles).where(eq(articles.id, articleId)).limit(1);

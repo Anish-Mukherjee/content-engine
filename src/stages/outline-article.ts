@@ -5,6 +5,7 @@ import { BRAND } from '../config/brand';
 import { db } from '../db/client';
 import { articles } from '../db/schema';
 import { generateOutline } from '../integrations/claude';
+import type { PerplexityBrief } from '../integrations/perplexity/types';
 import { TerminalError } from '../lib/errors';
 
 export async function outlineArticle(articleId: string): Promise<void> {
@@ -16,7 +17,7 @@ export async function outlineArticle(articleId: string): Promise<void> {
 
   const outline = await generateOutline(
     { id: article.id, keyword: article.keyword, searchVolume: article.searchVolume },
-    article.perplexityBrief,
+    article.perplexityBrief as PerplexityBrief,
     BRAND,
   );
 

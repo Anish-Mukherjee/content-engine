@@ -15,7 +15,8 @@ export const BRAND: BrandConfig = {
   signupUrl: 'https://xerogravity.com/signup',
   audience: 'active crypto futures traders',
   ctaHtml:
-    '<div class="xg-cta"><p>Getting these signals manually takes hours. ' +
-    'XeroGravity scans the market 24/7 and delivers AI-powered crypto futures signals ' +
-    'automatically. <a href="https://xerogravity.com/signup">Start free today.</a></p></div>',
+    '<div class="xg-cta"><p>Scanning the market for setups like this manually takes hours. ' +
+    'XeroGravity does it automatically — AI-powered signals with entry, take profit, and stop ' +
+    'loss levels delivered to your dashboard in real time. ' +
+    '<a href="https://xerogravity.com/signup">Start free.</a></p></div>',
 };

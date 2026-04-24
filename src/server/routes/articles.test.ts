@@ -86,4 +86,32 @@ describe('articles routes', () => {
     expect(res.body.articles[0]).toHaveProperty('updatedAt');
     expect(res.body.articles[0]).toHaveProperty('publishedAt');
   });
+
+  it('GET /api/articles returns total reflecting all matching rows (not just current page)', async () => {
+    const rows = Array.from({ length: 25 }, (_, i) => ({
+      keyword: `kw-${i}`, category: 'exchanges' as const, status: 'published' as const,
+      slug: `s-${i}`, title: `T${i}`, metaDescription: `MD${i}`,
+      publishedAt: new Date(2099, 0, i + 1),
+    }));
+    await db().insert(articles).values(rows);
+
+    const res = await request(app).get('/api/articles?page=1&limit=10');
+    expect(res.status).toBe(200);
+    expect(res.body.articles).toHaveLength(10);
+    expect(res.body.total).toBe(25);
+    expect(res.body.page).toBe(1);
+    expect(res.body.limit).toBe(10);
+  });
+
+  it('GET /api/articles?category=X returns total scoped to that category', async () => {
+    await db().insert(articles).values([
+      { keyword: 'a', category: 'exchanges', status: 'published', slug: 'a', publishedAt: new Date() },
+      { keyword: 'b', category: 'patterns',  status: 'published', slug: 'b', publishedAt: new Date() },
+      { keyword: 'c', category: 'patterns',  status: 'published', slug: 'c', publishedAt: new Date() },
+    ]);
+    const res = await request(app).get('/api/articles?category=patterns');
+    expect(res.status).toBe(200);
+    expect(res.body.total).toBe(2);
+    expect(res.body.articles).toHaveLength(2);
+  });
 });

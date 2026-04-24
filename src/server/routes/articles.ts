@@ -1,6 +1,6 @@
 // src/server/routes/articles.ts
 import { Router } from 'express';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, count, desc, eq } from 'drizzle-orm';
 
 import { db } from '../../db/client';
 import { articles } from '../../db/schema';
@@ -36,19 +36,17 @@ articlesRouter.get('/api/articles', async (req, res) => {
     ? req.query.category
     : null;
 
-  const rows = await db()
-    .select(PUBLIC_FIELDS)
-    .from(articles)
-    .where(
-      category
-        ? and(eq(articles.status, 'published'), eq(articles.category, category))
-        : eq(articles.status, 'published'),
-    )
-    .orderBy(desc(articles.publishedAt))
-    .limit(limit)
-    .offset(offset);
+  const where = category
+    ? and(eq(articles.status, 'published'), eq(articles.category, category))
+    : eq(articles.status, 'published');
 
-  res.json({ articles: rows, page, limit });
+  const [rows, totalRows] = await Promise.all([
+    db().select(PUBLIC_FIELDS).from(articles).where(where)
+      .orderBy(desc(articles.publishedAt)).limit(limit).offset(offset),
+    db().select({ value: count() }).from(articles).where(where),
+  ]);
+
+  res.json({ articles: rows, page, limit, total: totalRows[0]?.value ?? 0 });
 });
 
 articlesRouter.get('/api/articles/:slug', async (req, res) => {

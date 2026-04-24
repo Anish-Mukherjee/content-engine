@@ -49,7 +49,7 @@ export async function generateOutline(
 ): Promise<ArticleOutline> {
   const resp = await anthropic().messages.create({
     model: MODELS.outline,
-    max_tokens: 1500,
+    max_tokens: 3000,
     system: claudeOutlineSystem(brand),
     messages: [{
       role: 'user',

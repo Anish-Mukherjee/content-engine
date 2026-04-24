@@ -76,7 +76,7 @@ export async function writeArticleBody(
 ): Promise<string> {
   const resp = await anthropic().messages.create({
     model: MODELS.article,
-    max_tokens: 4000,
+    max_tokens: 8000,
     system: claudeArticleSystem(brand),
     messages: [{
       role: 'user',

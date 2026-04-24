@@ -73,6 +73,20 @@ describe('inline-images orchestrator', () => {
     expect((findOpenverse as unknown as vi.Mock).mock.calls[1][0]).toBe('Bybit futures perpetual');
   });
 
+  it('fetchInlineSource falls through to Wikimedia when Openverse throws (e.g. CF 403)', async () => {
+    (findOpenverse as unknown as vi.Mock).mockRejectedValueOnce(new Error('openverse 403 (Cloudflare)'));
+    (findWikimedia as unknown as vi.Mock).mockResolvedValueOnce(wikimediaResult);
+    const result = await fetchInlineSource('q');
+    expect(result).toEqual(wikimediaResult);
+  });
+
+  it('fetchInlineSource returns null when all sources throw', async () => {
+    (findOpenverse as unknown as vi.Mock).mockRejectedValueOnce(new Error('ov down'));
+    (findWikimedia as unknown as vi.Mock).mockRejectedValueOnce(new Error('wm down'));
+    const result = await fetchInlineSource('q');
+    expect(result).toBeNull();
+  });
+
   it('fetchInlineSource does not retry a short (<=3 word) query', async () => {
     (findOpenverse as unknown as vi.Mock).mockResolvedValueOnce(null);
     (findWikimedia as unknown as vi.Mock).mockResolvedValueOnce(null);

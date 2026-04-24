@@ -1,4 +1,5 @@
 // src/integrations/inline-images/index.ts
+import { logger } from '../../lib/logger';
 import { findInlineImage as findOpenverse } from '../openverse';
 import { findInlineImage as findWikimedia } from '../wikimedia';
 import { downloadAndSave } from './download';
@@ -37,12 +38,32 @@ export async function fetchInlineSource(query: string): Promise<InlineImageSourc
   // up. This mirrors how Claude phrases placeholders ("{subject} {qualifiers}").
   const variants = buildQueryVariants(query);
   for (const variant of variants) {
-    const openverse = await findOpenverse(variant);
+    const openverse = await tryGet(findOpenverse, 'openverse', variant);
     if (openverse) return openverse;
-    const wikimedia = await findWikimedia(variant);
+    const wikimedia = await tryGet(findWikimedia, 'wikimedia', variant);
     if (wikimedia) return wikimedia;
   }
   return null;
+}
+
+// Wrap each source call so a thrown error (e.g. Openverse's Cloudflare 403
+// challenge when our server IP looks bot-like) treats the source as a miss
+// and lets the next source in the chain run. Without this, one flaky source
+// short-circuits the whole fallback.
+async function tryGet(
+  fn: (q: string) => Promise<InlineImageSource | null>,
+  sourceName: string,
+  query: string,
+): Promise<InlineImageSource | null> {
+  try {
+    return await fn(query);
+  } catch (err) {
+    logger.warn(
+      { source: sourceName, query, err: err instanceof Error ? err.message : String(err) },
+      'inline image source errored; falling through',
+    );
+    return null;
+  }
 }
 
 function buildQueryVariants(query: string): string[] {

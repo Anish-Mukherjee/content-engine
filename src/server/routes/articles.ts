@@ -1,6 +1,6 @@
 // src/server/routes/articles.ts
 import { Router } from 'express';
-import { and, count, desc, eq } from 'drizzle-orm';
+import { and, count, desc, eq, ilike, or, type SQL } from 'drizzle-orm';
 
 import { db } from '../../db/client';
 import { articles } from '../../db/schema';
@@ -36,9 +36,16 @@ articlesRouter.get('/api/articles', async (req, res) => {
     ? req.query.category
     : null;
 
-  const where = category
-    ? and(eq(articles.status, 'published'), eq(articles.category, category))
-    : eq(articles.status, 'published');
+  const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 100) : '';
+
+  const conditions: SQL[] = [eq(articles.status, 'published')];
+  if (category) conditions.push(eq(articles.category, category));
+  if (q) {
+    const pattern = `%${q.replace(/[%_]/g, (c) => `\\${c}`)}%`;
+    const orExpr = or(ilike(articles.title, pattern), ilike(articles.keyword, pattern));
+    if (orExpr) conditions.push(orExpr);
+  }
+  const where = and(...conditions);
 
   const [rows, totalRows] = await Promise.all([
     db().select(PUBLIC_FIELDS).from(articles).where(where)

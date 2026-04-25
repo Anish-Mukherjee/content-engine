@@ -114,4 +114,55 @@ describe('articles routes', () => {
     expect(res.body.total).toBe(2);
     expect(res.body.articles).toHaveLength(2);
   });
+
+  it('GET /api/articles?q= filters by title/keyword (case-insensitive) and ignores empty q', async () => {
+    await db().insert(articles).values([
+      { keyword: 'macd basics', category: 'indicators', status: 'published', slug: 's-1',
+        title: 'MACD Basics for Crypto Traders', metaDescription: 'd', publishedAt: new Date() },
+      { keyword: 'rsi divergence', category: 'indicators', status: 'published', slug: 's-2',
+        title: 'RSI Divergence Explained', metaDescription: 'd', publishedAt: new Date() },
+      { keyword: 'bybit fees', category: 'exchanges', status: 'published', slug: 's-3',
+        title: 'Bybit Fee Structure 2026', metaDescription: 'd', publishedAt: new Date() },
+    ]);
+
+    const titleHit = await request(app).get('/api/articles?q=macd');
+    expect(titleHit.status).toBe(200);
+    expect(titleHit.body.total).toBe(1);
+    expect(titleHit.body.articles[0].slug).toBe('s-1');
+
+    const keywordHit = await request(app).get('/api/articles?q=BYBIT');
+    expect(keywordHit.body.total).toBe(1);
+    expect(keywordHit.body.articles[0].slug).toBe('s-3');
+
+    const empty = await request(app).get('/api/articles?q=');
+    expect(empty.body.total).toBe(3);
+
+    const noMatch = await request(app).get('/api/articles?q=zzzzzz');
+    expect(noMatch.body.total).toBe(0);
+    expect(noMatch.body.articles).toHaveLength(0);
+  });
+
+  it('GET /api/articles?q= treats LIKE wildcards as literal characters', async () => {
+    await db().insert(articles).values([
+      { keyword: 'a', category: 'indicators', status: 'published', slug: 's-1',
+        title: 'Plain Title', metaDescription: 'd', publishedAt: new Date() },
+      { keyword: 'b', category: 'indicators', status: 'published', slug: 's-2',
+        title: '100% APY Strategy', metaDescription: 'd', publishedAt: new Date() },
+    ]);
+    const res = await request(app).get('/api/articles?q=%25');
+    expect(res.body.total).toBe(1);
+    expect(res.body.articles[0].slug).toBe('s-2');
+  });
+
+  it('GET /api/articles?q=&category= combines filters', async () => {
+    await db().insert(articles).values([
+      { keyword: 'a', category: 'indicators', status: 'published', slug: 's-1',
+        title: 'MACD Indicator Guide', metaDescription: 'd', publishedAt: new Date() },
+      { keyword: 'b', category: 'patterns', status: 'published', slug: 's-2',
+        title: 'MACD on Pattern Breakouts', metaDescription: 'd', publishedAt: new Date() },
+    ]);
+    const res = await request(app).get('/api/articles?q=macd&category=indicators');
+    expect(res.body.total).toBe(1);
+    expect(res.body.articles[0].slug).toBe('s-1');
+  });
 });

@@ -1,30 +1,30 @@
 // src/integrations/inline-images/index.test.ts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-vi.mock('../openverse', () => ({ findInlineImage: vi.fn() }));
+vi.mock('../pexels', () => ({ findInlineImage: vi.fn() }));
 vi.mock('../wikimedia', () => ({ findInlineImage: vi.fn() }));
 vi.mock('./download', () => ({ downloadAndSave: vi.fn() }));
 
-import { findInlineImage as findOpenverse } from '../openverse';
+import { findInlineImage as findPexels } from '../pexels';
 import { findInlineImage as findWikimedia } from '../wikimedia';
 import { downloadAndSave } from './download';
 import { fetchInlineSource, resolvePlaceholder } from './index';
 
 describe('inline-images orchestrator', () => {
   beforeEach(() => {
-    (findOpenverse as unknown as vi.Mock).mockReset();
+    (findPexels as unknown as vi.Mock).mockReset();
     (findWikimedia as unknown as vi.Mock).mockReset();
     (downloadAndSave as unknown as vi.Mock).mockReset();
   });
   afterEach(() => vi.clearAllMocks());
 
-  const openverseResult = {
-    url: 'https://live.staticflickr.com/img.jpg',
-    sourceName: 'Flickr',
-    sourceUrl: 'https://www.flickr.com/photos/abc/1',
-    altText: 'alt',
-    width: 1000, height: 700,
-    license: 'CC BY 2.0',
+  const pexelsResult = {
+    url: 'https://images.pexels.com/photos/1/img.jpg?h=650',
+    sourceName: 'Pexels',
+    sourceUrl: 'https://www.pexels.com/photo/abc-1',
+    altText: 'A trader looking at multiple monitors with charts',
+    width: 4000, height: 2400,
+    license: 'Pexels License',
     attribution: 'Jane Doe',
     requiresAttribution: true,
   };
@@ -39,65 +39,65 @@ describe('inline-images orchestrator', () => {
     requiresAttribution: true,
   };
 
-  it('fetchInlineSource returns Openverse result when available', async () => {
-    (findOpenverse as unknown as vi.Mock).mockResolvedValueOnce(openverseResult);
+  it('fetchInlineSource returns Pexels result when available (Pexels is primary)', async () => {
+    (findPexels as unknown as vi.Mock).mockResolvedValueOnce(pexelsResult);
     const result = await fetchInlineSource('q');
-    expect(result).toEqual(openverseResult);
+    expect(result).toEqual(pexelsResult);
     expect(findWikimedia).not.toHaveBeenCalled();
   });
 
-  it('fetchInlineSource falls back to Wikimedia when Openverse returns null', async () => {
-    (findOpenverse as unknown as vi.Mock).mockResolvedValueOnce(null);
+  it('fetchInlineSource falls back to Wikimedia when Pexels returns null', async () => {
+    (findPexels as unknown as vi.Mock).mockResolvedValueOnce(null);
     (findWikimedia as unknown as vi.Mock).mockResolvedValueOnce(wikimediaResult);
     const result = await fetchInlineSource('q');
     expect(result).toEqual(wikimediaResult);
   });
 
   it('fetchInlineSource returns null when both sources miss', async () => {
-    (findOpenverse as unknown as vi.Mock).mockResolvedValueOnce(null);
+    (findPexels as unknown as vi.Mock).mockResolvedValueOnce(null);
     (findWikimedia as unknown as vi.Mock).mockResolvedValueOnce(null);
     const result = await fetchInlineSource('q');
     expect(result).toBeNull();
   });
 
   it('fetchInlineSource retries both sources with a 3-word version when the full query misses', async () => {
-    (findOpenverse as unknown as vi.Mock)
-      .mockResolvedValueOnce(null)       // full query: openverse miss
-      .mockResolvedValueOnce(openverseResult); // 3-word query: openverse hit
+    (findPexels as unknown as vi.Mock)
+      .mockResolvedValueOnce(null)        // full query: pexels miss
+      .mockResolvedValueOnce(pexelsResult); // 3-word query: pexels hit
     (findWikimedia as unknown as vi.Mock).mockResolvedValueOnce(null); // full query: wikimedia miss
 
     const result = await fetchInlineSource('Bybit futures perpetual contract trading interface');
 
-    expect(result).toEqual(openverseResult);
-    expect((findOpenverse as unknown as vi.Mock).mock.calls[0][0]).toBe('Bybit futures perpetual contract trading interface');
-    expect((findOpenverse as unknown as vi.Mock).mock.calls[1][0]).toBe('Bybit futures perpetual');
+    expect(result).toEqual(pexelsResult);
+    expect((findPexels as unknown as vi.Mock).mock.calls[0][0]).toBe('Bybit futures perpetual contract trading interface');
+    expect((findPexels as unknown as vi.Mock).mock.calls[1][0]).toBe('Bybit futures perpetual');
   });
 
-  it('fetchInlineSource falls through to Wikimedia when Openverse throws (e.g. CF 403)', async () => {
-    (findOpenverse as unknown as vi.Mock).mockRejectedValueOnce(new Error('openverse 403 (Cloudflare)'));
+  it('fetchInlineSource falls through to Wikimedia when Pexels throws (e.g. 401, network)', async () => {
+    (findPexels as unknown as vi.Mock).mockRejectedValueOnce(new Error('pexels 401'));
     (findWikimedia as unknown as vi.Mock).mockResolvedValueOnce(wikimediaResult);
     const result = await fetchInlineSource('q');
     expect(result).toEqual(wikimediaResult);
   });
 
   it('fetchInlineSource returns null when all sources throw', async () => {
-    (findOpenverse as unknown as vi.Mock).mockRejectedValueOnce(new Error('ov down'));
+    (findPexels as unknown as vi.Mock).mockRejectedValueOnce(new Error('pexels down'));
     (findWikimedia as unknown as vi.Mock).mockRejectedValueOnce(new Error('wm down'));
     const result = await fetchInlineSource('q');
     expect(result).toBeNull();
   });
 
   it('fetchInlineSource does not retry a short (<=3 word) query', async () => {
-    (findOpenverse as unknown as vi.Mock).mockResolvedValueOnce(null);
+    (findPexels as unknown as vi.Mock).mockResolvedValueOnce(null);
     (findWikimedia as unknown as vi.Mock).mockResolvedValueOnce(null);
     const result = await fetchInlineSource('ethereum ETH');
     expect(result).toBeNull();
-    expect(findOpenverse).toHaveBeenCalledTimes(1);
+    expect(findPexels).toHaveBeenCalledTimes(1);
     expect(findWikimedia).toHaveBeenCalledTimes(1);
   });
 
-  it('resolvePlaceholder downloads the image and returns a figure HTML block', async () => {
-    (findOpenverse as unknown as vi.Mock).mockResolvedValueOnce(openverseResult);
+  it('resolvePlaceholder downloads the image and returns a figure HTML block crediting Pexels', async () => {
+    (findPexels as unknown as vi.Mock).mockResolvedValueOnce(pexelsResult);
     (downloadAndSave as unknown as vi.Mock).mockResolvedValueOnce({
       url: '/images/slug-inline-1.jpg',
       filename: 'slug-inline-1.jpg',
@@ -113,14 +113,14 @@ describe('inline-images orchestrator', () => {
     expect(result?.figureHtml).toContain('height="450"');
     expect(result?.figureHtml).toContain('loading="lazy"');
     expect(result?.figureHtml).toContain('<figcaption>');
-    expect(result?.figureHtml).toContain('Flickr');
-    expect(result?.figureHtml).toContain('CC BY 2.0');
+    expect(result?.figureHtml).toContain('Pexels');
+    expect(result?.figureHtml).toContain('Pexels License');
     expect(result?.figureHtml).toContain('Jane Doe');
-    expect(downloadAndSave).toHaveBeenCalledWith(openverseResult.url, 'slug-inline-1', 800, 450);
+    expect(downloadAndSave).toHaveBeenCalledWith(pexelsResult.url, 'slug-inline-1', 800, 450);
   });
 
   it('resolvePlaceholder includes the artist name when attribution is present', async () => {
-    (findOpenverse as unknown as vi.Mock).mockResolvedValueOnce(null);
+    (findPexels as unknown as vi.Mock).mockResolvedValueOnce(null);
     (findWikimedia as unknown as vi.Mock).mockResolvedValueOnce(wikimediaResult);
     (downloadAndSave as unknown as vi.Mock).mockResolvedValueOnce({
       url: '/images/slug-inline-2.jpg', filename: 'slug-inline-2.jpg',
@@ -133,7 +133,7 @@ describe('inline-images orchestrator', () => {
   });
 
   it('resolvePlaceholder returns null when neither source has a candidate', async () => {
-    (findOpenverse as unknown as vi.Mock).mockResolvedValueOnce(null);
+    (findPexels as unknown as vi.Mock).mockResolvedValueOnce(null);
     (findWikimedia as unknown as vi.Mock).mockResolvedValueOnce(null);
     const result = await resolvePlaceholder('q', 'c', 'stem');
     expect(result).toBeNull();
@@ -141,7 +141,7 @@ describe('inline-images orchestrator', () => {
   });
 
   it('resolvePlaceholder HTML-escapes caption content', async () => {
-    (findOpenverse as unknown as vi.Mock).mockResolvedValueOnce(openverseResult);
+    (findPexels as unknown as vi.Mock).mockResolvedValueOnce(pexelsResult);
     (downloadAndSave as unknown as vi.Mock).mockResolvedValueOnce({
       url: '/images/s.jpg', filename: 's.jpg',
     });

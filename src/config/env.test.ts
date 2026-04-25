@@ -10,6 +10,7 @@ describe('parseEnv', () => {
     PERPLEXITY_API_KEY: 'k',
     ANTHROPIC_API_KEY: 'k',
     UNSPLASH_ACCESS_KEY: 'k',
+    PEXELS_API_KEY: 'k',
     GOOGLE_SERVICE_ACCOUNT_JSON_PATH: './g.json',
     FRONTEND_BASE_URL: 'https://xerogravity.com',
     FRONTEND_REVALIDATE_SECRET: 's',

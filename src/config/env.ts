@@ -11,6 +11,7 @@ const schema = z.object({
   PERPLEXITY_API_KEY: z.string().min(1),
   ANTHROPIC_API_KEY: z.string().min(1),
   UNSPLASH_ACCESS_KEY: z.string().min(1),
+  PEXELS_API_KEY: z.string().min(1),
   GOOGLE_SERVICE_ACCOUNT_JSON_PATH: z.string().min(1),
 
   FRONTEND_BASE_URL: z.string().url(),

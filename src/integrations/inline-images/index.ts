@@ -1,6 +1,6 @@
 // src/integrations/inline-images/index.ts
 import { logger } from '../../lib/logger';
-import { findInlineImage as findOpenverse } from '../openverse';
+import { findInlineImage as findPexels } from '../pexels';
 import { findInlineImage as findWikimedia } from '../wikimedia';
 import { downloadAndSave } from './download';
 import type { InlineImageSource } from './types';
@@ -32,23 +32,22 @@ function escText(s: string): string {
 export async function fetchInlineSource(query: string): Promise<InlineImageSource | null> {
   // The article writer prompt asks Claude for "very specific descriptive"
   // queries (e.g. "Bybit futures perpetual contract trading interface"),
-  // but CC image libraries use strict AND matching and return zero for
-  // queries longer than ~4 words. Try the full query first, then fall back
-  // to the first 3 words — usually the subject noun phrase — before giving
-  // up. This mirrors how Claude phrases placeholders ("{subject} {qualifiers}").
+  // but stock libraries use strict AND matching and return zero for queries
+  // longer than ~4 words. Try the full query first, then fall back to the
+  // first 3 words — usually the subject noun phrase — before giving up.
+  // This mirrors how Claude phrases placeholders ("{subject} {qualifiers}").
   const variants = buildQueryVariants(query);
   for (const variant of variants) {
-    const openverse = await tryGet(findOpenverse, 'openverse', variant);
-    if (openverse) return openverse;
+    const pexels = await tryGet(findPexels, 'pexels', variant);
+    if (pexels) return pexels;
     const wikimedia = await tryGet(findWikimedia, 'wikimedia', variant);
     if (wikimedia) return wikimedia;
   }
   return null;
 }
 
-// Wrap each source call so a thrown error (e.g. Openverse's Cloudflare 403
-// challenge when our server IP looks bot-like) treats the source as a miss
-// and lets the next source in the chain run. Without this, one flaky source
+// Wrap each source call so a thrown error treats the source as a miss and
+// lets the next source in the chain run. Without this, one flaky source
 // short-circuits the whole fallback.
 async function tryGet(
   fn: (q: string) => Promise<InlineImageSource | null>,

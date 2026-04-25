@@ -1,7 +1,7 @@
 // src/lib/html.test.ts
 import { describe, it, expect } from 'vitest';
 import {
-  sanitizeArticleHtml, countWords, extractFaqSchema,
+  sanitizeArticleHtml, countWords, extractFaqSchema, stripFaqSection,
   findInlineImagePlaceholders, replacePlaceholder,
 } from './html';
 
@@ -93,6 +93,47 @@ describe('html helpers', () => {
 
   it('extractFaqSchema returns null when no FAQ items', () => {
     expect(extractFaqSchema('<p>no faq</p>')).toBeNull();
+  });
+
+  it('stripFaqSection removes the entire faq-section block including nested divs', () => {
+    const html = [
+      '<h2>Bottom line</h2>',
+      '<p>Closing thoughts.</p>',
+      '<div class="faq-section">',
+      '<div class="faq-item">',
+      '<div class="faq-question">Q1?</div>',
+      '<div class="faq-answer"><p>A1.</p></div>',
+      '</div>',
+      '<div class="faq-item">',
+      '<div class="faq-question">Q2?</div>',
+      '<div class="faq-answer"><p>A2.</p></div>',
+      '</div>',
+      '</div>',
+    ].join('\n');
+    const out = stripFaqSection(html);
+    expect(out).not.toContain('faq-section');
+    expect(out).not.toContain('faq-item');
+    expect(out).not.toContain('Q1?');
+    expect(out).not.toContain('A2.');
+    expect(out).toContain('<h2>Bottom line</h2>');
+    expect(out).toContain('<p>Closing thoughts.</p>');
+  });
+
+  it('stripFaqSection is a no-op when there is no faq-section', () => {
+    const html = '<h2>Hi</h2><p>Body</p>';
+    expect(stripFaqSection(html)).toBe(html);
+  });
+
+  it('stripFaqSection preserves trailing content after the faq-section', () => {
+    const html = [
+      '<p>before</p>',
+      '<div class="faq-section"><div class="faq-item"><div class="faq-question">Q?</div><div class="faq-answer">A.</div></div></div>',
+      '<p>after</p>',
+    ].join('');
+    const out = stripFaqSection(html);
+    expect(out).not.toContain('faq-section');
+    expect(out).toContain('<p>before</p>');
+    expect(out).toContain('<p>after</p>');
   });
 
   it('findInlineImagePlaceholders returns query+caption for every placeholder', () => {

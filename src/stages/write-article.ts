@@ -8,7 +8,7 @@ import { writeArticleBody } from '../integrations/claude';
 import type { ArticleOutline } from '../integrations/claude/types';
 import type { PerplexityBrief } from '../integrations/perplexity/types';
 import { TerminalError } from '../lib/errors';
-import { countWords, extractFaqSchema, sanitizeArticleHtml } from '../lib/html';
+import { countWords, extractFaqSchema, sanitizeArticleHtml, stripFaqSection } from '../lib/html';
 
 const MIN_WORDS = 1000;
 
@@ -34,10 +34,11 @@ export async function writeArticle(articleId: string): Promise<void> {
     throw new TerminalError(`article too short: ${wordCount} words (min ${MIN_WORDS})`);
   }
   const faqSchema = extractFaqSchema(sanitized);
+  const articleHtml = stripFaqSection(sanitized);
 
   await db().update(articles).set({
     status: 'written',
-    articleHtml: sanitized,
+    articleHtml,
     wordCount,
     faqSchema: faqSchema ?? null,
     writtenAt: new Date(),

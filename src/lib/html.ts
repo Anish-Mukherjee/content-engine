@@ -82,6 +82,33 @@ export function extractFaqSchema(html: string): FaqSchema | null {
   };
 }
 
+// FAQ items are persisted as structured data via extractFaqSchema and rendered
+// by the frontend's <BlogFaqList>. Leaving the markup in the body would render
+// the questions twice. Strip the entire faq-section container by counting div
+// nesting forward from the opening tag — naive close-tag matching trips on the
+// nested faq-item / faq-question / faq-answer divs.
+export function stripFaqSection(html: string): string {
+  const startRe = /<div\s+class="faq-section"\s*>/i;
+  const startMatch = startRe.exec(html);
+  if (!startMatch) return html;
+  const start = startMatch.index;
+
+  const tagRe = /<(\/?)div\b[^>]*>/gi;
+  tagRe.lastIndex = start;
+  let depth = 0;
+  let m: RegExpExecArray | null;
+  while ((m = tagRe.exec(html)) !== null) {
+    depth += m[1] === '/' ? -1 : 1;
+    if (depth === 0) {
+      const end = m.index + m[0].length;
+      const before = html.slice(0, start).replace(/\s+$/, '');
+      const after = html.slice(end).replace(/^\s+/, '');
+      return after ? before + '\n\n' + after : before;
+    }
+  }
+  return html.slice(0, start).replace(/\s+$/, '');
+}
+
 export type InlineImagePlaceholder = {
   fullMatch: string;
   query: string;

@@ -117,10 +117,30 @@ export type InlineImagePlaceholder = {
 
 const PLACEHOLDER_RE = /<div\s+class="inline-image-placeholder"\s+data-query="([^"]*)"\s+data-caption="([^"]*)"\s*><\/div>/g;
 
+// sanitize-html escapes attribute values, so data-caption="P&L" comes back
+// out as data-caption="P&amp;L". Without decoding, escText() in the inline
+// image renderer would re-encode it as P&amp;amp;L and the figcaption
+// would render the literal text "P&amp;L". Decode the limited set of
+// entities sanitize-html emits in attribute context. &amp; is decoded last
+// so sequences like &amp;lt; round-trip to the literal &lt;.
+function decodeAttrEntities(s: string): string {
+  return s
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&');
+}
+
 export function findInlineImagePlaceholders(html: string): InlineImagePlaceholder[] {
   const results: InlineImagePlaceholder[] = [];
   for (const match of html.matchAll(PLACEHOLDER_RE)) {
-    results.push({ fullMatch: match[0], query: match[1], caption: match[2] });
+    results.push({
+      fullMatch: match[0],
+      query: decodeAttrEntities(match[1]),
+      caption: decodeAttrEntities(match[2]),
+    });
   }
   return results;
 }

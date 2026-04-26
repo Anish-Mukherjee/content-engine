@@ -8,8 +8,23 @@ const DIV_CLASSES = [
   'faq-answer',
   'xg-cta',
   'inline-image-placeholder',
+  'stat-row',
+  'stat-block',
+  'stat-value',
+  'stat-label',
+  'callout',
+  'tip',
+  'warning',
+  'callout-body',
+  'callout-title',
+  'callout-text',
+  'highlight-box',
+  'highlight-title',
+  'highlight-text',
 ];
 const FIGURE_CLASSES = ['article-image'];
+const TABLE_CLASSES = ['comparison-table'];
+const TD_CLASSES = ['td-green', 'td-red'];
 
 export function sanitizeArticleHtml(html: string): string {
   return sanitizeHtml(html, {
@@ -19,6 +34,7 @@ export function sanitizeArticleHtml(html: string): string {
     allowedTags: [
       'h2', 'h3', 'p', 'ul', 'ol', 'li', 'strong', 'em', 'a',
       'div', 'figure', 'figcaption', 'img',
+      'table', 'thead', 'tbody', 'tr', 'th', 'td',
     ],
     // Preserves sanitize-html defaults (style/script/textarea/option) plus h1.
     nonTextTags: ['style', 'script', 'textarea', 'option', 'noscript', 'h1'],
@@ -27,10 +43,14 @@ export function sanitizeArticleHtml(html: string): string {
       div: ['class', 'data-query', 'data-caption'],
       figure: ['class'],
       img: ['src', 'alt', 'width', 'height', 'loading'],
+      table: ['class'],
+      td: ['class'],
     },
     allowedClasses: {
       div: DIV_CLASSES,
       figure: FIGURE_CLASSES,
+      table: TABLE_CLASSES,
+      td: TD_CLASSES,
     },
     allowedSchemes: ['https', 'mailto'],
     allowedSchemesByTag: {

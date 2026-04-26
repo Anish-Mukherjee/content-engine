@@ -231,6 +231,12 @@ STRUCTURE RULES:
 - Use bullet points only when listing 3 or more distinct items
 - FAQ answers: direct answer first, 2-3 sentences max, no padding
 
+SEO + AEO RULES:
+- Include primary keyword naturally in H1, first paragraph, and at least 2 H2s
+- Include secondary keywords naturally — never forced or repeated
+- FAQ section is mandatory — answers must be self-contained so AI search engines can pull them directly
+- Use schema-ready HTML structure throughout
+
 CREDIBILITY SIGNALS:
 - Reference at least one specific real data point from a credible source in every article
 - Acceptable sources: CoinGlass, CoinGecko, TradingView, exchange official documentation, CryptoQuant, Glassnode, DefiLlama
@@ -242,11 +248,72 @@ CREDIBILITY SIGNALS:
   e.g. "${brand.name} identified this exact pattern on BTC last week — <a href='https://${brand.domain}/results'>view the signal result here</a>"
 - Only include data points that are verifiable and realistic — never invent statistics
 
-SEO + AEO RULES:
-- Include primary keyword naturally in H1, first paragraph, and at least 2 H2s
-- Include secondary keywords naturally — never forced or repeated
-- FAQ section is mandatory — answers must be self-contained so AI search engines can pull them directly
-- Use schema-ready HTML structure throughout
+SPECIAL CONTENT BLOCKS — use these where relevant:
+
+STAT BLOCKS — use when article contains 3 key numbers worth highlighting. Place after the introduction or within a relevant section:
+<div class="stat-row">
+  <div class="stat-block">
+    <div class="stat-value">[number]</div>
+    <div class="stat-label">[label]</div>
+  </div>
+  <div class="stat-block">
+    <div class="stat-value">[number]</div>
+    <div class="stat-label">[label]</div>
+  </div>
+  <div class="stat-block">
+    <div class="stat-value">[number]</div>
+    <div class="stat-label">[label]</div>
+  </div>
+</div>
+
+PRO TIP CALLOUT — use once per article for the single most valuable practical tip:
+<div class="callout tip">
+  <div class="callout-body">
+    <div class="callout-title">Pro tip</div>
+    <div class="callout-text">[tip text]</div>
+  </div>
+</div>
+
+WARNING CALLOUT — use once per article for the most important risk or mistake to avoid:
+<div class="callout warning">
+  <div class="callout-body">
+    <div class="callout-title">Important</div>
+    <div class="callout-text">[warning text]</div>
+  </div>
+</div>
+
+COMPARISON TABLE — use when comparing 2 or more exchanges, strategies, leverage levels, or options. Always include a thead and color code where relevant:
+<table class="comparison-table">
+  <thead>
+    <tr>
+      <th>[column 1]</th>
+      <th>[column 2]</th>
+      <th>[column 3]</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>[value]</td>
+      <td class="td-green">[positive value]</td>
+      <td class="td-red">[negative value]</td>
+    </tr>
+  </tbody>
+</table>
+
+REAL TRADING SCENARIO — use once per article to illustrate a practical example with specific numbers:
+<div class="highlight-box">
+  <div class="highlight-title">Real trading scenario</div>
+  <div class="highlight-text">[scenario with specific entry price, leverage, stop loss, take profit, and risk/reward ratio]</div>
+</div>
+
+RULES FOR SPECIAL BLOCKS:
+- Stat blocks: only when you have 3 genuinely meaningful numbers — never invented or vague
+- Pro tip: maximum 1 per article
+- Warning: maximum 1 per article
+- Comparison table: only when comparing distinct options
+- Real trading scenario: maximum 1 per article, must use realistic current prices
+- Never force these elements — only include them where they genuinely add value
+- Never use more than 3 special blocks total per article excluding the real trading scenario
 
 IMAGE PLACEHOLDERS:
 - Insert 2-3 image placeholders at points where a visual genuinely helps the reader understand something
@@ -260,7 +327,7 @@ HTML FORMAT:
 - Return complete HTML only
 - No html, head, body wrapper tags
 - Start directly with h1
-- Use only these tags: h1, h2, h3, p, ul, li, strong, figure, figcaption, div as specified below
+- Use only these tags: h1, h2, h3, p, ul, li, strong, figure, figcaption, div, table, thead, tbody, tr, th, td as specified in this prompt
 - Wrap all FAQs in: <div class="faq-section">
 - Wrap each FAQ in: <div class="faq-item">
 - Question in: <div class="faq-question">

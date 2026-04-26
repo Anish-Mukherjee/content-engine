@@ -65,6 +65,51 @@ describe('html helpers', () => {
     expect(out).not.toContain('javascript:');
   });
 
+  it('sanitizeArticleHtml preserves stat-row / stat-block / stat-value / stat-label', () => {
+    const html = '<div class="stat-row"><div class="stat-block"><div class="stat-value">$83,000</div><div class="stat-label">BTC entry</div></div></div>';
+    const out = sanitizeArticleHtml(html);
+    expect(out).toContain('class="stat-row"');
+    expect(out).toContain('class="stat-block"');
+    expect(out).toContain('class="stat-value"');
+    expect(out).toContain('class="stat-label"');
+    expect(out).toContain('$83,000');
+  });
+
+  it('sanitizeArticleHtml preserves tip and warning callouts including the modifier class', () => {
+    const tip = '<div class="callout tip"><div class="callout-body"><div class="callout-title">Pro tip</div><div class="callout-text">Always set a stop.</div></div></div>';
+    const tipOut = sanitizeArticleHtml(tip);
+    expect(tipOut).toContain('class="callout tip"');
+    expect(tipOut).toContain('class="callout-title"');
+
+    const warn = '<div class="callout warning"><div class="callout-body"><div class="callout-title">Important</div><div class="callout-text">Never risk more than 1%.</div></div></div>';
+    const warnOut = sanitizeArticleHtml(warn);
+    expect(warnOut).toContain('class="callout warning"');
+  });
+
+  it('sanitizeArticleHtml preserves comparison-table with thead/tbody and td-green/td-red', () => {
+    const html = [
+      '<table class="comparison-table">',
+      '<thead><tr><th>Exchange</th><th>Maker fee</th><th>Funding</th></tr></thead>',
+      '<tbody><tr><td>Bybit</td><td class="td-green">0.02%</td><td class="td-red">0.01%</td></tr></tbody>',
+      '</table>',
+    ].join('');
+    const out = sanitizeArticleHtml(html);
+    expect(out).toContain('<table class="comparison-table">');
+    expect(out).toContain('<thead>');
+    expect(out).toContain('<tbody>');
+    expect(out).toContain('<th>Exchange</th>');
+    expect(out).toContain('<td class="td-green">0.02%</td>');
+    expect(out).toContain('<td class="td-red">0.01%</td>');
+  });
+
+  it('sanitizeArticleHtml preserves highlight-box for trading scenarios', () => {
+    const html = '<div class="highlight-box"><div class="highlight-title">Real trading scenario</div><div class="highlight-text">Long BTC at $83,000 with 5x leverage.</div></div>';
+    const out = sanitizeArticleHtml(html);
+    expect(out).toContain('class="highlight-box"');
+    expect(out).toContain('class="highlight-title"');
+    expect(out).toContain('class="highlight-text"');
+  });
+
   it('countWords ignores HTML tags', () => {
     expect(countWords('<h1>One two three</h1><p>four five</p>')).toBe(5);
   });

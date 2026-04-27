@@ -50,8 +50,8 @@ npm run seed:keywords
 # Place google-service-account.json in /srv/content-pipeline/ (gitignored).
 # Ensure GOOGLE_SERVICE_ACCOUNT_JSON_PATH in .env points to it.
 #
-# Inline images use Openverse (anonymous, no key) with Wikimedia Commons as
-# fallback — no additional setup needed.
+# Inline images use Freepik (FREEPIK_API_KEY required, sign up at
+# https://www.freepik.com/api) with Wikimedia Commons as the keyless fallback.
 
 # 4. Start (cron disabled for first hour)
 pm2 start ecosystem.config.cjs

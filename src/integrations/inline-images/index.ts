@@ -81,14 +81,20 @@ export async function resolvePlaceholder(
 
   const saved = await downloadAndSave(source.url, filenameStem, INLINE_WIDTH, INLINE_HEIGHT);
 
-  const attributionPrefix = source.attribution ? `${escText(source.attribution)} — ` : '';
+  // Sources with requiresAttribution=false (e.g. paid Freepik API) get a clean
+  // figcaption with just the caption — no author/source/license suffix. CC and
+  // free-tier sources keep the full attribution chain.
+  const authorPrefix = source.attribution ? `${escText(source.attribution)} — ` : '';
+  const attributionHtml = source.requiresAttribution
+    ? ` — ${authorPrefix}` +
+      `<a href="${escAttr(source.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escText(source.sourceName)}</a> ` +
+      `(${escText(source.license)})`
+    : '';
   const figureHtml =
     `<figure class="article-image">` +
     `<img src="${escAttr(saved.url)}" alt="${escAttr(caption)}" ` +
     `width="${INLINE_WIDTH}" height="${INLINE_HEIGHT}" loading="lazy" />` +
-    `<figcaption>${escText(caption)} — ${attributionPrefix}` +
-    `<a href="${escAttr(source.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escText(source.sourceName)}</a> ` +
-    `(${escText(source.license)})</figcaption>` +
+    `<figcaption>${escText(caption)}${attributionHtml}</figcaption>` +
     `</figure>`;
 
   return {

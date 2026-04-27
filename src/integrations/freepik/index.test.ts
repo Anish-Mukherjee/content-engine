@@ -49,7 +49,7 @@ describe('freepik integration', () => {
     expect(getDownloadUrl).not.toHaveBeenCalled();
   });
 
-  it('maps a photo to InlineImageSource with Freepik License + author attribution', async () => {
+  it('maps a photo to InlineImageSource flagged as attribution-free (paid Freepik plan)', async () => {
     (searchImages as unknown as vi.Mock).mockResolvedValueOnce([makePhoto()]);
     (getDownloadUrl as unknown as vi.Mock).mockResolvedValueOnce(
       'https://img.freepik.com/free-photo/x.jpg?size=1500&t=...',
@@ -61,8 +61,9 @@ describe('freepik integration', () => {
     expect(result?.sourceUrl).toBe('https://www.freepik.com/free-photo/trader_1.htm');
     expect(result?.altText).toBe('A trader looking at multiple monitors with charts');
     expect(result?.license).toBe('Freepik License');
-    expect(result?.attribution).toBe('Jane Doe');
-    expect(result?.requiresAttribution).toBe(true);
+    // Paid plan does not require crediting the author per Freepik's docs.
+    expect(result?.attribution).toBeNull();
+    expect(result?.requiresAttribution).toBe(false);
     expect(result?.width).toBe(626);
     expect(result?.height).toBe(417);
   });
@@ -129,12 +130,12 @@ describe('freepik integration', () => {
     expect(result?.altText).toBe('');
   });
 
-  it('returns null attribution when author name is empty', async () => {
+  it('attribution stays null regardless of author name (paid plan)', async () => {
     (searchImages as unknown as vi.Mock).mockResolvedValueOnce([makePhoto({ authorName: '' })]);
     (getDownloadUrl as unknown as vi.Mock).mockResolvedValueOnce('https://img.freepik.com/x.jpg');
     const result = await findInlineImage('q');
     expect(result?.attribution).toBeNull();
-    expect(result?.requiresAttribution).toBe(true);
+    expect(result?.requiresAttribution).toBe(false);
   });
 
   it('only calls getDownloadUrl once (for the first usable candidate)', async () => {

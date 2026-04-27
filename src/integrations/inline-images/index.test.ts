@@ -25,8 +25,8 @@ describe('inline-images orchestrator', () => {
     altText: 'A trader looking at multiple monitors with charts',
     width: 626, height: 417,
     license: 'Freepik License',
-    attribution: 'Jane Doe',
-    requiresAttribution: true,
+    attribution: null,
+    requiresAttribution: false,
   };
   const wikimediaResult = {
     url: 'https://upload.wikimedia.org/w.jpg',
@@ -96,7 +96,7 @@ describe('inline-images orchestrator', () => {
     expect(findWikimedia).toHaveBeenCalledTimes(1);
   });
 
-  it('resolvePlaceholder downloads the image and returns a figure HTML block crediting Freepik', async () => {
+  it('resolvePlaceholder produces a figure with caption only (no Freepik attribution suffix on paid plan)', async () => {
     (findFreepik as unknown as vi.Mock).mockResolvedValueOnce(freepikResult);
     (downloadAndSave as unknown as vi.Mock).mockResolvedValueOnce({
       url: '/images/slug-inline-1.jpg',
@@ -112,10 +112,10 @@ describe('inline-images orchestrator', () => {
     expect(result?.figureHtml).toContain('width="800"');
     expect(result?.figureHtml).toContain('height="450"');
     expect(result?.figureHtml).toContain('loading="lazy"');
-    expect(result?.figureHtml).toContain('<figcaption>');
-    expect(result?.figureHtml).toContain('Freepik');
-    expect(result?.figureHtml).toContain('Freepik License');
-    expect(result?.figureHtml).toContain('Jane Doe');
+    expect(result?.figureHtml).toContain('<figcaption>Bybit interface</figcaption>');
+    // No author, no source link, no license string when requiresAttribution=false.
+    expect(result?.figureHtml).not.toContain('Freepik License');
+    expect(result?.figureHtml).not.toContain('href="https://www.freepik.com');
     expect(downloadAndSave).toHaveBeenCalledWith(freepikResult.url, 'slug-inline-1', 800, 450);
   });
 

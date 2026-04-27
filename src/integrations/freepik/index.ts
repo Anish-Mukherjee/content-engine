@@ -37,6 +37,10 @@ function parseSize(size: string | undefined): { width: number; height: number } 
 
 function toInlineImageSource(photo: FreepikResource, downloadUrl: string): InlineImageSource {
   const dims = parseSize(photo.image.source.size) ?? { width: 0, height: 0 };
+  // Our paid Freepik API plan covers attribution-free use of freemium content
+  // ("Premium, Premium+ and Pro users do not need to credit the author" per
+  // freepik.com docs). Flag this so the inline-images figcaption skips the
+  // author/source/license suffix. Wikimedia (CC BY-SA) still requires it.
   return {
     url: downloadUrl,
     sourceName: 'Freepik',
@@ -45,7 +49,7 @@ function toInlineImageSource(photo: FreepikResource, downloadUrl: string): Inlin
     width: dims.width,
     height: dims.height,
     license: 'Freepik License',
-    attribution: photo.author?.name || null,
-    requiresAttribution: true,
+    attribution: null,
+    requiresAttribution: false,
   };
 }

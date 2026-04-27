@@ -1,6 +1,6 @@
 // src/integrations/inline-images/index.ts
 import { logger } from '../../lib/logger';
-import { findInlineImage as findPexels } from '../pexels';
+import { findInlineImage as findFreepik } from '../freepik';
 import { findInlineImage as findWikimedia } from '../wikimedia';
 import { downloadAndSave } from './download';
 import type { InlineImageSource } from './types';
@@ -38,8 +38,8 @@ export async function fetchInlineSource(query: string): Promise<InlineImageSourc
   // This mirrors how Claude phrases placeholders ("{subject} {qualifiers}").
   const variants = buildQueryVariants(query);
   for (const variant of variants) {
-    const pexels = await tryGet(findPexels, 'pexels', variant);
-    if (pexels) return pexels;
+    const freepik = await tryGet(findFreepik, 'freepik', variant);
+    if (freepik) return freepik;
     const wikimedia = await tryGet(findWikimedia, 'wikimedia', variant);
     if (wikimedia) return wikimedia;
   }

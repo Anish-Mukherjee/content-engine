@@ -35,7 +35,7 @@ jobs:
       PERPLEXITY_API_KEY: ci
       ANTHROPIC_API_KEY: ci
       UNSPLASH_ACCESS_KEY: ci
-      PEXELS_API_KEY: ci
+      FREEPIK_API_KEY: ci
       GOOGLE_SERVICE_ACCOUNT_JSON_PATH: ./noop.json
       # Match the value test files set on `process.env` at runtime — env() is
       # module-cached, so the first read wins. Mismatch makes publish-due.test.ts

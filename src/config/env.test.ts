@@ -21,9 +21,23 @@ describe('parseEnv', () => {
     const parsed = parseEnv(baseEnv);
     expect(parsed.PORT).toBe(4000);
     expect(parsed.LOG_LEVEL).toBe('info');
-    expect(parsed.PUBLISH_HOUR_UTC).toBe(9);
+    expect(parsed.PUBLISH_HOURS_UTC).toEqual([9]);
     expect(parsed.DISABLE_CRON).toBe(false);
     expect(parsed.WEBHOOK_URL).toBeUndefined();
+  });
+
+  it('parses PUBLISH_HOURS_UTC as a sorted, deduped list of hours', () => {
+    expect(parseEnv({ ...baseEnv, PUBLISH_HOURS_UTC: '9,21' }).PUBLISH_HOURS_UTC).toEqual([9, 21]);
+    expect(parseEnv({ ...baseEnv, PUBLISH_HOURS_UTC: '21, 9' }).PUBLISH_HOURS_UTC).toEqual([9, 21]);
+    expect(parseEnv({ ...baseEnv, PUBLISH_HOURS_UTC: '9, 9, 21' }).PUBLISH_HOURS_UTC).toEqual([9, 21]);
+    expect(parseEnv({ ...baseEnv, PUBLISH_HOURS_UTC: '7' }).PUBLISH_HOURS_UTC).toEqual([7]);
+  });
+
+  it('rejects PUBLISH_HOURS_UTC values outside 0-23', () => {
+    expect(() => parseEnv({ ...baseEnv, PUBLISH_HOURS_UTC: '9,24' })).toThrow(/PUBLISH_HOURS_UTC/);
+    expect(() => parseEnv({ ...baseEnv, PUBLISH_HOURS_UTC: '-1' })).toThrow(/PUBLISH_HOURS_UTC/);
+    expect(() => parseEnv({ ...baseEnv, PUBLISH_HOURS_UTC: 'morning' })).toThrow(/PUBLISH_HOURS_UTC/);
+    expect(() => parseEnv({ ...baseEnv, PUBLISH_HOURS_UTC: '' })).toThrow(/PUBLISH_HOURS_UTC/);
   });
 
   it('throws when a required var is missing', () => {

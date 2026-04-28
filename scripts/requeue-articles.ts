@@ -15,24 +15,22 @@ import { revalidate } from '../src/integrations/frontend';
 import { logger } from '../src/lib/logger';
 
 async function nextSlotAfter(latest: Date | null): Promise<Date> {
-  const hour = env().PUBLISH_HOUR_UTC;
-  const base = latest ?? new Date();
-  const next = new Date(base);
-  next.setUTCDate(next.getUTCDate() + 1);
-  next.setUTCHours(hour, 0, 0, 0);
+  const hours = [...new Set(env().PUBLISH_HOURS_UTC)].sort((a, b) => a - b);
+  const now = new Date();
+  const earliest = new Date(now.getTime() + 60 * 60 * 1000);
+  const cursor = latest && latest > earliest ? latest : earliest;
 
-  const earliest = new Date();
-  earliest.setUTCHours(earliest.getUTCHours() + 1);
-  if (next < earliest) {
-    const now = new Date();
-    return new Date(Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate() + 1,
-      hour, 0, 0, 0,
+  for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+    const day = new Date(Date.UTC(
+      cursor.getUTCFullYear(), cursor.getUTCMonth(), cursor.getUTCDate() + dayOffset
     ));
+    for (const hour of hours) {
+      const slot = new Date(day);
+      slot.setUTCHours(hour, 0, 0, 0);
+      if (slot > cursor) return slot;
+    }
   }
-  return next;
+  throw new Error('nextSlotAfter: no slot found in 7 days');
 }
 
 async function main() {

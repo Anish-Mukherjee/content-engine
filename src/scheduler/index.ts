@@ -39,8 +39,11 @@ export function startScheduler(): void {
   // Hourly :15 — harvest completed DataForSEO tasks + filter
   cron.schedule('15 * * * *', () => run('harvestKeywords', harvestKeywords), { timezone: 'UTC' });
 
-  // Daily 03:00 UTC — advance one article pending → scheduled
-  cron.schedule('0 3 * * *', () => run('driveArticle', driveArticle), { timezone: 'UTC' });
+  // 03:00 + 15:00 UTC — advance one article pending → scheduled per tick.
+  // Two ticks/day pairs with PUBLISH_HOURS_UTC=9,21 so the queue gets two
+  // slots filled per UTC day. Reduce/extend by editing this cron expression
+  // and PUBLISH_HOURS_UTC in tandem.
+  cron.schedule('0 3,15 * * *', () => run('driveArticle', driveArticle), { timezone: 'UTC' });
 
   // Hourly :00 — publish articles whose scheduledAt <= now
   cron.schedule('0 * * * *', () => run('publishDue', publishDue), { timezone: 'UTC' });

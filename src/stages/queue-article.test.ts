@@ -8,11 +8,11 @@ import { queueArticle, getNextSlot } from './queue-article';
 describe('queueArticle', () => {
   beforeEach(async () => {
     await db().execute(sql`TRUNCATE TABLE articles CASCADE`);
-    process.env.PUBLISH_HOURS_UTC = '9';
+    process.env.PUBLISH_HOUR_UTC = '9';
   });
   afterAll(async () => { await closeDb(); });
 
-  it('schedules first article for the next 09:00 UTC slot', async () => {
+  it('schedules an article for the next 09:00 UTC slot', async () => {
     const [a] = await db().insert(articles).values({
       keyword: 'k', category: 'exchanges', status: 'image_ready', slug: 's',
     }).returning();
@@ -26,83 +26,44 @@ describe('queueArticle', () => {
     expect(scheduled.getTime()).toBeGreaterThan(before.getTime());
   });
 
-  it('schedules second article exactly 24h after the latest scheduled (single hour config)', async () => {
-    const existing = new Date(Date.UTC(2099, 0, 10, 9, 0, 0));
-    await db().insert(articles).values({
-      keyword: 'prior', category: 'exchanges', status: 'scheduled',
-      slug: 'prior', scheduledAt: existing,
-    });
+  it('queues two consecutive articles for the SAME slot (same-time batch)', async () => {
     const [a] = await db().insert(articles).values({
-      keyword: 'k', category: 'exchanges', status: 'image_ready', slug: 's',
+      keyword: 'a', category: 'exchanges', status: 'image_ready', slug: 'a',
+    }).returning();
+    const [b] = await db().insert(articles).values({
+      keyword: 'b', category: 'exchanges', status: 'image_ready', slug: 'b',
     }).returning();
 
     await queueArticle(a.id);
+    await queueArticle(b.id);
 
-    const [row] = await db().select().from(articles).where(eq(articles.id, a.id));
-    const scheduled = new Date(row.scheduledAt!);
-    expect(scheduled.getUTCFullYear()).toBe(2099);
-    expect(scheduled.getUTCMonth()).toBe(0);
-    expect(scheduled.getUTCDate()).toBe(11);
-    expect(scheduled.getUTCHours()).toBe(9);
+    const [rowA] = await db().select().from(articles).where(eq(articles.id, a.id));
+    const [rowB] = await db().select().from(articles).where(eq(articles.id, b.id));
+    expect(new Date(rowA.scheduledAt!).toISOString()).toBe(new Date(rowB.scheduledAt!).toISOString());
   });
 });
 
-// getNextSlot is exported so multi-hour configs can be exercised without
-// trying to override the module-cached env() reader. Each case simulates a
-// known DB state (the latest article's scheduledAt) and asserts the picked
-// slot.
+// getNextSlot is pure (no DB) so the cases below cover the full surface.
 describe('getNextSlot', () => {
-  beforeEach(async () => {
-    await db().execute(sql`TRUNCATE TABLE articles CASCADE`);
-  });
-  afterAll(async () => { await closeDb(); });
-
-  it('with a single hour [9], next slot when no prior is the next 09:00 UTC after now+1h', async () => {
-    // Pick a now whose +1h is still before today 09:00 — expect today 09:00.
+  it('returns today at the publish hour when now+1h is still before it', () => {
     const now = new Date(Date.UTC(2099, 0, 10, 7, 30, 0));
-    const slot = await getNextSlot([9], now);
-    expect(slot.toISOString()).toBe('2099-01-10T09:00:00.000Z');
+    expect(getNextSlot(9, now).toISOString()).toBe('2099-01-10T09:00:00.000Z');
   });
 
-  it('with [9,21], picks today 21:00 when prior is today 09:00', async () => {
-    const existing = new Date(Date.UTC(2099, 0, 10, 9, 0, 0));
-    await db().insert(articles).values({
-      keyword: 'prior', category: 'exchanges', status: 'scheduled',
-      slug: 'prior', scheduledAt: existing,
-    });
-    // now is irrelevant to this case because latest > now+1h.
-    const now = new Date(Date.UTC(2099, 0, 10, 9, 30, 0));
-    const slot = await getNextSlot([9, 21], now);
-    expect(slot.toISOString()).toBe('2099-01-10T21:00:00.000Z');
+  it('returns tomorrow when today\'s slot has already passed (now > publish hour)', () => {
+    const now = new Date(Date.UTC(2099, 0, 10, 10, 0, 0));
+    expect(getNextSlot(9, now).toISOString()).toBe('2099-01-11T09:00:00.000Z');
   });
 
-  it('with [9,21], picks tomorrow 09:00 when prior is today 21:00', async () => {
-    const existing = new Date(Date.UTC(2099, 0, 10, 21, 0, 0));
-    await db().insert(articles).values({
-      keyword: 'prior', category: 'exchanges', status: 'scheduled',
-      slug: 'prior', scheduledAt: existing,
-    });
-    const now = new Date(Date.UTC(2099, 0, 10, 22, 0, 0));
-    const slot = await getNextSlot([9, 21], now);
-    expect(slot.toISOString()).toBe('2099-01-11T09:00:00.000Z');
+  it('returns tomorrow when today\'s slot is within the now+1h buffer', () => {
+    // now=02:30, publish=03:00 — today's slot is 30 min away (< 1h buffer) → tomorrow.
+    const now = new Date(Date.UTC(2099, 0, 10, 2, 30, 0));
+    expect(getNextSlot(3, now).toISOString()).toBe('2099-01-11T03:00:00.000Z');
   });
 
-  it('respects the now+1h floor when latest is far in the past', async () => {
-    // Stale prior, e.g. older than now. Cursor should jump to now+1h.
-    const stalePrior = new Date(Date.UTC(2026, 0, 1, 9, 0, 0));
-    await db().insert(articles).values({
-      keyword: 'prior', category: 'exchanges', status: 'scheduled',
-      slug: 'prior', scheduledAt: stalePrior,
-    });
-    // now = 2099-01-10T07:30 → earliest = 08:30 → next [9] after 08:30 is 09:00 today.
-    const now = new Date(Date.UTC(2099, 0, 10, 7, 30, 0));
-    const slot = await getNextSlot([9], now);
-    expect(slot.toISOString()).toBe('2099-01-10T09:00:00.000Z');
-  });
-
-  it('dedupes and sorts duplicate or out-of-order hour input', async () => {
-    const now = new Date(Date.UTC(2099, 0, 10, 7, 30, 0));
-    const slot = await getNextSlot([21, 9, 9], now);
-    expect(slot.toISOString()).toBe('2099-01-10T09:00:00.000Z');
+  it('two calls in quick succession return the same slot (no per-article spacing)', () => {
+    const now = new Date(Date.UTC(2099, 0, 10, 1, 0, 0));
+    expect(getNextSlot(3, now).toISOString()).toBe('2099-01-10T03:00:00.000Z');
+    expect(getNextSlot(3, now).toISOString()).toBe('2099-01-10T03:00:00.000Z');
   });
 });

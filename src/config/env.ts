@@ -23,29 +23,13 @@ const schema = z.object({
     .optional()
     .transform((v) => (v === '' ? undefined : v)),
 
-  // Comma-separated list of UTC hours (0-23) at which articles publish.
-  // 1 hour = 1 article/day; 2 hours = 2/day, etc. Slots are filled in
-  // chronological order by `getNextSlot` (queue-article.ts).
-  PUBLISH_HOURS_UTC: z
-    .string()
-    .default('9')
-    .transform((raw, ctx) => {
-      const tokens = raw.split(',').map((t) => t.trim()).filter((t) => t.length > 0);
-      if (tokens.length === 0) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'PUBLISH_HOURS_UTC: must contain at least one hour' });
-        return z.NEVER;
-      }
-      const hours: number[] = [];
-      for (const t of tokens) {
-        const n = Number(t);
-        if (!Number.isInteger(n) || n < 0 || n > 23) {
-          ctx.addIssue({ code: z.ZodIssueCode.custom, message: `PUBLISH_HOURS_UTC: invalid hour "${t}" (expected integer 0-23)` });
-          return z.NEVER;
-        }
-        hours.push(n);
-      }
-      return [...new Set(hours)].sort((a, b) => a - b);
-    }),
+  // The single UTC hour (0-23) at which all daily articles publish.
+  PUBLISH_HOUR_UTC: z.coerce.number().int().min(0).max(23).default(9),
+
+  // How many articles to drive (and publish) per UTC day. The scheduler
+  // calls driveArticle this many times per cron tick; all of them queue
+  // for the same next-PUBLISH_HOUR_UTC slot, so they go live together.
+  ARTICLES_PER_DAY: z.coerce.number().int().min(1).max(20).default(1),
   DISABLE_CRON: z
     .union([z.literal('true'), z.literal('false'), z.boolean()])
     .transform((v) => v === true || v === 'true')

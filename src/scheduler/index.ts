@@ -11,6 +11,13 @@ import { publishDue } from '../stages/publish-due';
 
 type Handler = () => Promise<void>;
 
+async function driveDailyBatch(): Promise<void> {
+  const n = env().ARTICLES_PER_DAY;
+  for (let i = 0; i < n; i++) {
+    await driveArticle();
+  }
+}
+
 async function run(name: string, handler: Handler): Promise<void> {
   const started = Date.now();
   logger.info({ cron: name }, 'cron tick start');
@@ -39,11 +46,10 @@ export function startScheduler(): void {
   // Hourly :15 — harvest completed DataForSEO tasks + filter
   cron.schedule('15 * * * *', () => run('harvestKeywords', harvestKeywords), { timezone: 'UTC' });
 
-  // 03:00 + 15:00 UTC — advance one article pending → scheduled per tick.
-  // Two ticks/day pairs with PUBLISH_HOURS_UTC=9,21 so the queue gets two
-  // slots filled per UTC day. Reduce/extend by editing this cron expression
-  // and PUBLISH_HOURS_UTC in tandem.
-  cron.schedule('0 3,15 * * *', () => run('driveArticle', driveArticle), { timezone: 'UTC' });
+  // Daily 03:00 UTC — drive ARTICLES_PER_DAY articles in a row through the
+  // pipeline (research → outline → write → image → queue). All of them queue
+  // for the same next-PUBLISH_HOUR_UTC slot, so they publish as a batch.
+  cron.schedule('0 3 * * *', () => run('driveDailyBatch', driveDailyBatch), { timezone: 'UTC' });
 
   // Hourly :00 — publish articles whose scheduledAt <= now
   cron.schedule('0 * * * *', () => run('publishDue', publishDue), { timezone: 'UTC' });

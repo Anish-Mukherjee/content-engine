@@ -156,8 +156,8 @@ Return ONLY a JSON object with this exact structure:
 {
   "title": "SEO optimized article title (60 chars max)",
   "slug": "url-friendly-slug",
-  "meta_title": "SEO meta title (60 chars max)",
-  "meta_description": "compelling meta description (155 chars max)",
+  "meta_title": "SEO meta title — STRICT 50-60 chars, never under 50, never over 60",
+  "meta_description": "compelling meta description — STRICT 140-155 chars, never under 140, never over 155 (count carefully before returning)",
   "primary_keyword": "${keyword}",
   "secondary_keywords": ["keyword 1", "keyword 2", "keyword 3"],
   "target_audience": "who this article is for",

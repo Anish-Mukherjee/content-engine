@@ -1,6 +1,6 @@
 // src/integrations/unsplash/index.ts
 import type { Category } from '../../config/categories';
-import { CATEGORY_IMAGE_QUERY } from '../../config/categories';
+import { CATEGORY_IMAGE_QUERY, CATEGORY_IMAGE_QUERY_WIDE } from '../../config/categories';
 import { downloadAndSave } from '../inline-images/download';
 import { search } from './client';
 import type { LocalImage, UnsplashPhoto } from './types';
@@ -8,8 +8,11 @@ import type { LocalImage, UnsplashPhoto } from './types';
 const HERO_WIDTH = 1200;
 const HERO_HEIGHT = 630;
 
-export async function searchHeroImage(category: Category): Promise<UnsplashPhoto | null> {
-  const query = CATEGORY_IMAGE_QUERY[category];
+export async function searchHeroCandidates(
+  category: Category,
+  opts: { wide?: boolean } = {},
+): Promise<UnsplashPhoto[]> {
+  const query = opts.wide ? CATEGORY_IMAGE_QUERY_WIDE[category] : CATEGORY_IMAGE_QUERY[category];
   const resp = await search(query) as {
     results?: Array<{
       id: string;
@@ -20,17 +23,20 @@ export async function searchHeroImage(category: Category): Promise<UnsplashPhoto
       height: number;
     }>;
   };
-  const top = resp.results?.[0];
-  if (!top) return null;
-  return {
-    id: top.id,
-    urlRaw: top.urls.raw,
-    altText: top.alt_description ?? '',
-    photographerName: top.user.name,
-    photographerUrl: top.user.links.html,
-    width: top.width,
-    height: top.height,
-  };
+  return (resp.results ?? []).map((r) => ({
+    id: r.id,
+    urlRaw: r.urls.raw,
+    altText: r.alt_description ?? '',
+    photographerName: r.user.name,
+    photographerUrl: r.user.links.html,
+    width: r.width,
+    height: r.height,
+  }));
+}
+
+export async function searchHeroImage(category: Category): Promise<UnsplashPhoto | null> {
+  const cands = await searchHeroCandidates(category);
+  return cands[0] ?? null;
 }
 
 export async function downloadAndCrop(

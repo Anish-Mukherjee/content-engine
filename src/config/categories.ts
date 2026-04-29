@@ -27,3 +27,16 @@ export const WEEKLY_ROTATION_COUNTS: Record<Category, number> = {
 export function isCategory(v: string): v is Category {
   return (CATEGORIES as readonly string[]).includes(v);
 }
+
+export const CATEGORY_IMAGE_QUERY_WIDE: Record<Category, string> = {
+  exchanges:  'crypto exchange screen',
+  patterns:   'candlestick chart',
+  indicators: 'trading chart screen',
+  concepts:   'cryptocurrency market',
+  strategies: 'trading desk',
+  automation: 'computer code screen',
+  risk:       'financial market data',
+  coins:      'bitcoin coin',
+  education:  'studying computer',
+  analysis:   'data analytics screen',
+};

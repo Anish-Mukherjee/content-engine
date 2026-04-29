@@ -10,12 +10,15 @@ vi.mock('../db/queries', () => ({
   isContentHashUsed: vi.fn(),
   recordImageUsage: vi.fn(),
 }));
-vi.mock('node:fs/promises', () => ({ default: { unlink: vi.fn() }, unlink: vi.fn() }));
+vi.mock('node:fs', () => ({
+  promises: { unlink: vi.fn() },
+}));
 
 import {
   searchHeroCandidates, downloadAndCrop, getFallbackImage,
 } from '../integrations/unsplash';
 import { isSourceIdUsed, isContentHashUsed, recordImageUsage } from '../db/queries';
+import { promises as fs } from 'node:fs';
 import { pickUniqueHero } from './image-fetch';
 
 const candA = { id: 'A', urlRaw: 'u/A', altText: '', photographerName: '', photographerUrl: '', width: 2000, height: 1500 };
@@ -71,6 +74,7 @@ describe('pickUniqueHero', () => {
     });
 
     expect(out.unsplashId).toBe('B');
+    expect(fs.unlink).toHaveBeenCalledWith(expect.stringContaining('s-hero.jpg'));
   });
 
   it('exhausts primary, tries widened query, then falls back to category fallback', async () => {

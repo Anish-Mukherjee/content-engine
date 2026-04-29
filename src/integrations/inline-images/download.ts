@@ -1,4 +1,5 @@
 // src/integrations/inline-images/download.ts
+import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
@@ -8,6 +9,8 @@ import { TransientError } from '../../lib/errors';
 export type SavedImage = {
   url: string;       // path served by our own HTTP, e.g. /images/foo.jpg
   filename: string;  // e.g. foo.jpg
+  contentHash: string;     // sha256 hex of the JPEG bytes
+  bytes: Buffer;
 };
 
 function storageDir(): string {
@@ -39,8 +42,11 @@ export async function downloadAndSave(
   const filename = `${filenameStem}.jpg`;
   await fs.writeFile(path.join(dir, filename), cropped);
 
+  const contentHash = createHash('sha256').update(cropped).digest('hex');
   return {
     url: `/images/${filename}`,
     filename,
+    contentHash,
+    bytes: cropped,
   };
 }

@@ -12,11 +12,11 @@ export const BRAND: BrandConfig = {
   name: 'XeroGravity',
   domain: 'xerogravity.com',
   description: 'a crypto futures trading signals platform powered by AI',
-  signupUrl: 'https://xerogravity.com/signup',
+  signupUrl: 'https://xerogravity.com/',
   audience: 'active crypto futures traders',
   ctaHtml:
     '<div class="xg-cta"><p>Scanning the market for setups like this manually takes hours. ' +
     'XeroGravity does it automatically — AI-powered signals with entry, take profit, and stop ' +
     'loss levels delivered to your dashboard in real time. ' +
-    '<a href="https://xerogravity.com/signup">Start free.</a></p></div>',
+    '<a href="https://xerogravity.com/">Start free.</a></p></div>',
 };

@@ -21,31 +21,38 @@ function extValue(page: WikimediaPage, key: string): string | null {
   return stripped === '' ? null : stripped;
 }
 
-export async function findInlineImage(query: string): Promise<InlineImageSource | null> {
+export type WikimediaCandidate = {
+  sourceId: string;     // the descriptionurl — stable per file
+  inlineSource: InlineImageSource;
+};
+
+export async function findInlineCandidates(query: string): Promise<WikimediaCandidate[]> {
   const pages = await searchImages(query);
-  if (pages.length === 0) return null;
+  const out: WikimediaCandidate[] = [];
+  for (const page of pages) {
+    const info = page.imageinfo?.[0];
+    if (!info) continue;
+    if (info.width < MIN_WIDTH || info.height < MIN_HEIGHT) continue;
+    if (!RASTER_IMAGE_RE.test(info.url)) continue;
+    out.push({
+      sourceId: info.descriptionurl,
+      inlineSource: {
+        url: info.url,
+        sourceName: 'Wikimedia Commons',
+        sourceUrl: info.descriptionurl,
+        altText: extValue(page, 'ImageDescription') ?? query,
+        width: info.width,
+        height: info.height,
+        license: extValue(page, 'LicenseShortName') ?? 'Creative Commons',
+        attribution: extValue(page, 'Artist'),
+        requiresAttribution: true,
+      },
+    });
+  }
+  return out;
+}
 
-  const valid = pages.filter((p) => {
-    const info = p.imageinfo?.[0];
-    if (!info) return false;
-    if (info.width < MIN_WIDTH || info.height < MIN_HEIGHT) return false;
-    if (!RASTER_IMAGE_RE.test(info.url)) return false;
-    return true;
-  });
-  if (valid.length === 0) return null;
-
-  const page = valid[0];
-  const info = page.imageinfo![0];
-
-  return {
-    url: info.url,
-    sourceName: 'Wikimedia Commons',
-    sourceUrl: info.descriptionurl,
-    altText: extValue(page, 'ImageDescription') ?? query,
-    width: info.width,
-    height: info.height,
-    license: extValue(page, 'LicenseShortName') ?? 'Creative Commons',
-    attribution: extValue(page, 'Artist'),
-    requiresAttribution: true,
-  };
+export async function findInlineImage(query: string): Promise<InlineImageSource | null> {
+  const cands = await findInlineCandidates(query);
+  return cands[0]?.inlineSource ?? null;
 }

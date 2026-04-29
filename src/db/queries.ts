@@ -2,7 +2,7 @@
 import { and, asc, eq, lt, sql } from 'drizzle-orm';
 
 import { db } from './client';
-import { articles } from './schema';
+import { articles, imageUsage } from './schema';
 
 export async function pickNextDrivable() {
   const [retryable] = await db()
@@ -43,4 +43,40 @@ export async function markFailed(id: string, failedStatus: string, err: unknown)
       retryCount: isTerminal ? 3 : sql`${articles.retryCount} + 1`,
     })
     .where(eq(articles.id, id));
+}
+
+export type RecordImageUsageInput = {
+  articleId: string;
+  role: 'hero' | 'inline';
+  position: number | null;
+  url: string;
+  source: 'unsplash' | 'freepik' | 'wikimedia' | 'legacy';
+  sourceId: string | null;
+  contentHash: string;
+};
+
+export async function recordImageUsage(input: RecordImageUsageInput): Promise<void> {
+  await db().insert(imageUsage).values(input);
+}
+
+export async function isSourceIdUsed(source: string, sourceId: string): Promise<boolean> {
+  const [row] = await db()
+    .select({ id: imageUsage.id })
+    .from(imageUsage)
+    .where(and(eq(imageUsage.source, source), eq(imageUsage.sourceId, sourceId)))
+    .limit(1);
+  return !!row;
+}
+
+export async function isContentHashUsed(contentHash: string): Promise<boolean> {
+  const [row] = await db()
+    .select({ id: imageUsage.id })
+    .from(imageUsage)
+    .where(eq(imageUsage.contentHash, contentHash))
+    .limit(1);
+  return !!row;
+}
+
+export async function clearImageUsageForArticle(articleId: string): Promise<void> {
+  await db().delete(imageUsage).where(eq(imageUsage.articleId, articleId));
 }

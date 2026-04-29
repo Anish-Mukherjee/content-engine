@@ -18,4 +18,5 @@ export type LocalImage = {
   photographerUrl: string | null;
   unsplashId: string | null;
   isFallback: boolean;
+  contentHash?: string;   // optional because fallbacks don't have one
 };

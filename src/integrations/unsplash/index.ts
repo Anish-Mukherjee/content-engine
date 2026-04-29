@@ -43,6 +43,7 @@ export async function downloadAndCrop(
   photo: UnsplashPhoto,
   slug: string,
   altText: string,
+  filenameStem: string = `${slug}-hero`,
 ): Promise<LocalImage> {
   // Unsplash serves dynamic crops via raw URL params — request a 2000px wide
   // master and let sharp re-crop locally. This avoids depending on Unsplash's
@@ -50,7 +51,7 @@ export async function downloadAndCrop(
   const target = new URL(photo.urlRaw);
   target.searchParams.set('w', '2000');
   target.searchParams.set('q', '80');
-  const saved = await downloadAndSave(target.toString(), `${slug}-hero`, HERO_WIDTH, HERO_HEIGHT);
+  const saved = await downloadAndSave(target.toString(), filenameStem, HERO_WIDTH, HERO_HEIGHT);
 
   return {
     url: saved.url,
@@ -66,6 +67,7 @@ export async function downloadAndCrop(
     photographerUrl: photo.photographerUrl,
     unsplashId: photo.id,
     isFallback: false,
+    contentHash: saved.contentHash,
   };
 }
 

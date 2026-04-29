@@ -90,3 +90,19 @@ export const articles = pgTable('articles', {
   idxScheduled: index('idx_art_scheduled').on(t.scheduledAt),
   idxPublished: index('idx_art_published').on(t.publishedAt),
 }));
+
+export const imageUsage = pgTable('image_usage', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  articleId: uuid('article_id').notNull().references(() => articles.id, { onDelete: 'cascade' }),
+  role: text('role').notNull(),                  // 'hero' | 'inline'
+  position: integer('position'),                  // null for hero, 1..N for inline
+  url: text('url').notNull(),                     // /images/foo-hero.jpg
+  source: text('source').notNull(),               // 'unsplash' | 'freepik' | 'wikimedia' | 'legacy'
+  sourceId: text('source_id'),                    // upstream id; null for legacy/unknown
+  contentHash: text('content_hash').notNull(),    // sha256 hex of saved JPEG bytes
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (t) => ({
+  idxSource: index('idx_iu_source').on(t.source, t.sourceId),
+  idxHash: index('idx_iu_hash').on(t.contentHash),
+  idxArticle: index('idx_iu_article').on(t.articleId),
+}));

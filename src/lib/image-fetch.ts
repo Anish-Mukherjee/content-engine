@@ -4,6 +4,9 @@ import path from 'node:path';
 
 import type { Category } from '../config/categories';
 import { isContentHashUsed, isSourceIdUsed, recordImageUsage } from '../db/queries';
+import { fetchInlineCandidates, renderInlineFigure } from '../integrations/inline-images';
+import type { InlineImageResult } from '../integrations/inline-images';
+import { downloadAndSave } from '../integrations/inline-images/download';
 import {
   downloadAndCrop, getFallbackImage, searchHeroCandidates,
 } from '../integrations/unsplash';
@@ -64,10 +67,6 @@ export async function pickUniqueHero(args: PickHeroArgs): Promise<LocalImage> {
   }
   return getFallbackImage(args.category, args.altText);
 }
-
-import { fetchInlineCandidates, renderInlineFigure } from '../integrations/inline-images';
-import { downloadAndSave } from '../integrations/inline-images/download';
-import type { InlineImageResult } from '../integrations/inline-images';
 
 const INLINE_WIDTH = 800;
 const INLINE_HEIGHT = 450;

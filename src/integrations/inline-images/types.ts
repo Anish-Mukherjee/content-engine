@@ -15,3 +15,9 @@ export type InlineImageSource = {
   attribution: string | null; // artist / photographer name if available
   requiresAttribution: boolean;
 };
+
+export type InlineImageCandidate = {
+  source: 'freepik' | 'wikimedia';
+  sourceId: string;
+  inlineSource: InlineImageSource;
+};

@@ -2,8 +2,10 @@
 import { logger } from '../../lib/logger';
 import { findInlineImage as findFreepik } from '../freepik';
 import { findInlineImage as findWikimedia } from '../wikimedia';
+import { findInlineCandidates as findFreepikCandidates } from '../freepik';
+import { findInlineCandidates as findWikimediaCandidates } from '../wikimedia';
 import { downloadAndSave } from './download';
-import type { InlineImageSource } from './types';
+import type { InlineImageSource, InlineImageCandidate } from './types';
 
 const INLINE_WIDTH = 800;
 const INLINE_HEIGHT = 450;
@@ -69,6 +71,34 @@ function buildQueryVariants(query: string): string[] {
   const words = query.trim().split(/\s+/).filter(Boolean);
   if (words.length <= 3) return [query];
   return [query, words.slice(0, 3).join(' ')];
+}
+
+export async function fetchInlineCandidates(query: string): Promise<InlineImageCandidate[]> {
+  const variants = buildQueryVariants(query);
+  const out: InlineImageCandidate[] = [];
+  for (const variant of variants) {
+    const fp = await tryGetMany(findFreepikCandidates, 'freepik', variant);
+    out.push(...fp.map((c) => ({ source: 'freepik' as const, sourceId: c.sourceId, inlineSource: c.inlineSource })));
+    const wm = await tryGetMany(findWikimediaCandidates, 'wikimedia', variant);
+    out.push(...wm.map((c) => ({ source: 'wikimedia' as const, sourceId: c.sourceId, inlineSource: c.inlineSource })));
+  }
+  return out;
+}
+
+async function tryGetMany<T>(
+  fn: (q: string) => Promise<T[]>,
+  sourceName: string,
+  query: string,
+): Promise<T[]> {
+  try {
+    return await fn(query);
+  } catch (err) {
+    logger.warn(
+      { source: sourceName, query, err: err instanceof Error ? err.message : String(err) },
+      'inline image source errored; treating as empty',
+    );
+    return [];
+  }
 }
 
 export async function resolvePlaceholder(

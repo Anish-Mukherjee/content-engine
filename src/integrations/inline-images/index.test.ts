@@ -1,14 +1,21 @@
 // src/integrations/inline-images/index.test.ts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-vi.mock('../freepik', () => ({ findInlineImage: vi.fn() }));
-vi.mock('../wikimedia', () => ({ findInlineImage: vi.fn() }));
+vi.mock('../freepik', () => ({
+  findInlineImage: vi.fn(), findInlineCandidates: vi.fn(),
+}));
+vi.mock('../wikimedia', () => ({
+  findInlineImage: vi.fn(), findInlineCandidates: vi.fn(),
+}));
 vi.mock('./download', () => ({ downloadAndSave: vi.fn() }));
 
 import { findInlineImage as findFreepik } from '../freepik';
 import { findInlineImage as findWikimedia } from '../wikimedia';
 import { downloadAndSave } from './download';
 import { fetchInlineSource, resolvePlaceholder } from './index';
+import { fetchInlineCandidates } from './index';
+import { findInlineCandidates as findFreepikCandidates } from '../freepik';
+import { findInlineCandidates as findWikimediaCandidates } from '../wikimedia';
 
 describe('inline-images orchestrator', () => {
   beforeEach(() => {
@@ -148,5 +155,51 @@ describe('inline-images orchestrator', () => {
     const result = await resolvePlaceholder('q', 'Hello "world" <evil>', 'stem');
     expect(result?.figureHtml).toContain('Hello &quot;world&quot; &lt;evil&gt;');
     expect(result?.figureHtml).not.toContain('<evil>');
+  });
+});
+
+describe('fetchInlineCandidates', () => {
+  beforeEach(() => {
+    (findFreepikCandidates as unknown as vi.Mock).mockReset();
+    (findWikimediaCandidates as unknown as vi.Mock).mockReset();
+  });
+
+  it('concatenates freepik then wikimedia for the full query', async () => {
+    (findFreepikCandidates as unknown as vi.Mock).mockResolvedValueOnce([
+      { sourceId: 'F1', inlineSource: { url: 'fp/1' } as any },
+    ]);
+    (findWikimediaCandidates as unknown as vi.Mock).mockResolvedValueOnce([
+      { sourceId: 'https://commons/W1', inlineSource: { url: 'wm/1' } as any },
+    ]);
+
+    const out = await fetchInlineCandidates('short query');
+    expect(out.map((c) => c.source)).toEqual(['freepik', 'wikimedia']);
+    expect(out.map((c) => c.sourceId)).toEqual(['F1', 'https://commons/W1']);
+  });
+
+  it('also tries 3-word fallback query when full query is long', async () => {
+    (findFreepikCandidates as unknown as vi.Mock)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ sourceId: 'F2', inlineSource: { url: 'fp/2' } as any }]);
+    (findWikimediaCandidates as unknown as vi.Mock)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const out = await fetchInlineCandidates('Bybit futures perpetual contract trading interface');
+    expect(out).toHaveLength(1);
+    expect((findFreepikCandidates as unknown as vi.Mock).mock.calls[0][0])
+      .toBe('Bybit futures perpetual contract trading interface');
+    expect((findFreepikCandidates as unknown as vi.Mock).mock.calls[1][0])
+      .toBe('Bybit futures perpetual');
+  });
+
+  it('treats a thrown source as empty (per-source isolation)', async () => {
+    (findFreepikCandidates as unknown as vi.Mock).mockRejectedValueOnce(new Error('401'));
+    (findWikimediaCandidates as unknown as vi.Mock).mockResolvedValueOnce([
+      { sourceId: 'W', inlineSource: { url: 'wm' } as any },
+    ]);
+    const out = await fetchInlineCandidates('q');
+    expect(out).toHaveLength(1);
+    expect(out[0].source).toBe('wikimedia');
   });
 });

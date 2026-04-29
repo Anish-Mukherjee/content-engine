@@ -5,6 +5,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 
 import { TransientError } from '../../lib/errors';
+import { imagesDir } from '../../lib/paths';
 
 export type SavedImage = {
   url: string;       // path served by our own HTTP, e.g. /images/foo.jpg
@@ -12,10 +13,6 @@ export type SavedImage = {
   contentHash: string;     // sha256 hex of the JPEG bytes
   bytes: Buffer;
 };
-
-function storageDir(): string {
-  return process.env.STORAGE_DIR ?? path.resolve('storage');
-}
 
 export async function downloadBytes(url: string): Promise<ArrayBuffer> {
   const res = await fetch(url, {
@@ -37,7 +34,7 @@ export async function downloadAndSave(
     .jpeg({ quality: 85 })
     .toBuffer();
 
-  const dir = path.join(storageDir(), 'images');
+  const dir = imagesDir();
   await fs.mkdir(dir, { recursive: true });
   const filename = `${filenameStem}.jpg`;
   await fs.writeFile(path.join(dir, filename), cropped);

@@ -1,14 +1,13 @@
 // src/server/routes/images.ts
 import express, { Router } from 'express';
-import path from 'node:path';
+
+import { imagesDir } from '../../lib/paths';
 
 export const imagesRouter = Router();
 
-const storageDir = () => process.env.STORAGE_DIR ?? path.resolve('storage');
-
 imagesRouter.use(
   '/images',
-  express.static(path.join(storageDir(), 'images'), {
+  express.static(imagesDir(), {
     maxAge: '7d',
     immutable: true,
     fallthrough: false,

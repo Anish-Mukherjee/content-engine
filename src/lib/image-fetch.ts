@@ -9,6 +9,7 @@ import {
 } from '../integrations/unsplash';
 import type { LocalImage, UnsplashPhoto } from '../integrations/unsplash/types';
 import { logger } from './logger';
+import { imagesDir } from './paths';
 
 export type PickHeroArgs = {
   category: Category;
@@ -18,10 +19,6 @@ export type PickHeroArgs = {
   filenameStem: string;
 };
 
-function storageDir(): string {
-  return process.env.STORAGE_DIR ?? path.resolve('storage');
-}
-
 async function tryHeroCandidate(
   photo: UnsplashPhoto,
   args: PickHeroArgs,
@@ -30,11 +27,17 @@ async function tryHeroCandidate(
 
   const local = await downloadAndCrop(photo, args.slug, args.altText, args.filenameStem);
   const hash = local.contentHash;
-  if (!hash) return local;
+  if (!hash) {
+    logger.warn(
+      { unsplashId: photo.id, articleId: args.articleId },
+      'hero image has no content hash; skipping dedup check (this should not happen)',
+    );
+    return local;
+  }
 
   if (await isContentHashUsed(hash)) {
     try {
-      await fs.unlink(path.join(storageDir(), 'images', `${args.filenameStem}.jpg`));
+      await fs.unlink(path.join(imagesDir(), `${args.filenameStem}.jpg`));
     } catch (err) {
       logger.warn({ err }, 'failed to unlink duplicate hero file');
     }

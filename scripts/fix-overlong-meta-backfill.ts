@@ -1,12 +1,17 @@
 // scripts/fix-overlong-meta-backfill.ts
 //
-// One-shot backfill: shorten the two article meta_description rows that
-// overshot the 155-char SEO limit (Ahrefs "Meta description too long: 2").
-// The outline-stage prompt has been tightened so future articles stay in the
-// 140-155 band; this script just rewrites the two stragglers in place.
+// One-shot backfill: shorten the article meta_description rows that overshot
+// the 155-char SEO limit when rendered. Two cases:
+//   1) Raw DB length > 155 (Ahrefs "Meta description too long: 2")
+//   2) Raw DB length within 155 but contains `&`, which sanitize-html /
+//      Next encodes to `&amp;` in the served HTML, pushing the rendered
+//      length past 160. Ahrefs counts the rendered HTML, so the encoded
+//      version is what gets flagged.
 //
-// The replacements were hand-written to preserve SEO intent (primary keyword
-// in the first 60 chars, key terms intact) while landing inside 140-155.
+// The outline-stage prompt has been tightened so future articles stay in the
+// 140-155 band and avoid `&`; this script rewrites the stragglers in place.
+//
+// Idempotent — safe to re-run on already-fixed rows.
 //
 // Usage:
 //   npx tsx scripts/fix-overlong-meta-backfill.ts
@@ -29,6 +34,18 @@ const REPLACEMENTS: ReadonlyArray<{ slug: string; metaDescription: string }> = [
     slug: 'cryptocurrency-candlestick-patterns',
     metaDescription:
       'Master 15+ cryptocurrency candlestick patterns with real BTC/ETH examples, backtested win rates, RSI confirmation tips, and risk management.',
+  },
+  {
+    // Original contained `&` which encoded to `&amp;` (rendered length 163).
+    slug: 'tradingview-webhook-crypto',
+    metaDescription:
+      'Automate crypto trades in under 20ms with TradingView webhooks — PineScript templates, JSON payloads, Binance/Bybit setup, and common error fixes.',
+  },
+  {
+    // Original contained `&` which encoded to `&amp;` (rendered length 161).
+    slug: 'candlestick-pattern-cryptocurrency',
+    metaDescription:
+      'Master 10+ candlestick patterns for crypto trading. Real BTC/ETH chart examples, backtested win rates, RSI combos, plus step-by-step entries and stops.',
   },
 ];
 

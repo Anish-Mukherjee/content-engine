@@ -24,7 +24,8 @@ export async function fetchImage(articleId: string): Promise<void> {
 
   await db().update(articles).set({ status: 'fetching_image' }).where(eq(articles.id, articleId));
 
-  const hero = await fetchHero(articleId, article.slug, category);
+  const altText = article.title || article.slug;
+  const hero = await fetchHero(articleId, article.slug, category, altText);
   const processedHtml = await processInlinePlaceholders(article.articleHtml ?? '', article.slug);
 
   await db().update(articles).set({
@@ -35,14 +36,19 @@ export async function fetchImage(articleId: string): Promise<void> {
   }).where(eq(articles.id, articleId));
 }
 
-async function fetchHero(articleId: string, slug: string, category: Category): Promise<LocalImage> {
+async function fetchHero(
+  articleId: string,
+  slug: string,
+  category: Category,
+  altText: string,
+): Promise<LocalImage> {
   try {
     const photo = await searchHeroImage(category);
-    if (photo) return await downloadAndCrop(photo, slug);
-    return getFallbackImage(category);
+    if (photo) return await downloadAndCrop(photo, slug, altText);
+    return getFallbackImage(category, altText);
   } catch (err) {
     logger.warn({ err, articleId }, 'hero image fetch failed; using category fallback');
-    return getFallbackImage(category);
+    return getFallbackImage(category, altText);
   }
 }
 

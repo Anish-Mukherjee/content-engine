@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+vi.mock('../integrations/inline-images', () => ({
+  fetchInlineCandidates: vi.fn(),
+  renderInlineFigure: vi.fn(({ localUrl }: any) => `<figure><img src="${localUrl}"/></figure>`),
+}));
+vi.mock('../integrations/inline-images/download', () => ({
+  downloadAndSave: vi.fn(),
+}));
+
 vi.mock('../integrations/unsplash', () => ({
   searchHeroCandidates: vi.fn(),
   downloadAndCrop: vi.fn(),
@@ -21,6 +29,30 @@ import { isSourceIdUsed, isContentHashUsed, recordImageUsage } from '../db/queri
 import { promises as fs } from 'node:fs';
 import { pickUniqueHero } from './image-fetch';
 
+import { pickUniqueInline } from './image-fetch';
+import { fetchInlineCandidates } from '../integrations/inline-images';
+import { downloadAndSave } from '../integrations/inline-images/download';
+
+const fpCand = (id: string) => ({
+  source: 'freepik' as const,
+  sourceId: id,
+  inlineSource: {
+    url: `https://fp/${id}`, sourceName: 'Freepik', sourceUrl: '',
+    altText: '', width: 800, height: 450,
+    license: 'Freepik License', attribution: null, requiresAttribution: false,
+  },
+});
+
+const wmCand = (id: string) => ({
+  source: 'wikimedia' as const,
+  sourceId: id,
+  inlineSource: {
+    url: `https://wm/${id}`, sourceName: 'Wikimedia Commons', sourceUrl: id,
+    altText: '', width: 800, height: 450,
+    license: 'CC BY-SA 4.0', attribution: 'Jane', requiresAttribution: true,
+  },
+});
+
 const candA = { id: 'A', urlRaw: 'u/A', altText: '', photographerName: '', photographerUrl: '', width: 2000, height: 1500 };
 const candB = { id: 'B', urlRaw: 'u/B', altText: '', photographerName: '', photographerUrl: '', width: 2000, height: 1500 };
 
@@ -33,6 +65,12 @@ beforeEach(() => {
     if (photo.id === 'A') return localA;
     return localB;
   });
+  (downloadAndSave as unknown as vi.Mock).mockImplementation(async (url: string, stem: string) => ({
+    url: `/images/${stem}.jpg`,
+    filename: `${stem}.jpg`,
+    contentHash: `hash-${url}`,
+    bytes: Buffer.from(''),
+  }));
 });
 
 describe('pickUniqueHero', () => {
@@ -94,5 +132,62 @@ describe('pickUniqueHero', () => {
     expect(searchHeroCandidates).toHaveBeenCalledTimes(2);
     expect(searchHeroCandidates).toHaveBeenNthCalledWith(2, 'indicators', { wide: true });
     expect(recordImageUsage).not.toHaveBeenCalled();
+  });
+});
+
+describe('pickUniqueInline', () => {
+  it('saves first non-duplicate candidate and registers it', async () => {
+    (fetchInlineCandidates as unknown as vi.Mock).mockResolvedValueOnce([fpCand('1'), fpCand('2')]);
+    (isSourceIdUsed as unknown as vi.Mock).mockResolvedValue(false);
+    (isContentHashUsed as unknown as vi.Mock).mockResolvedValue(false);
+
+    const out = await pickUniqueInline({
+      query: 'q', caption: 'c', articleId: 'art', position: 1, filenameStem: 's-inline-1',
+    });
+
+    expect(out).not.toBeNull();
+    expect(out!.localUrl).toBe('/images/s-inline-1.jpg');
+    expect(recordImageUsage).toHaveBeenCalledWith(expect.objectContaining({
+      role: 'inline', position: 1, source: 'freepik', sourceId: '1',
+    }));
+  });
+
+  it('skips source-id dupe and tries next', async () => {
+    (fetchInlineCandidates as unknown as vi.Mock).mockResolvedValueOnce([fpCand('1'), wmCand('https://commons/W')]);
+    (isSourceIdUsed as unknown as vi.Mock).mockImplementation(async (s: string, id: string) => s === 'freepik' && id === '1');
+    (isContentHashUsed as unknown as vi.Mock).mockResolvedValue(false);
+
+    const out = await pickUniqueInline({
+      query: 'q', caption: 'c', articleId: 'art', position: 2, filenameStem: 's-inline-2',
+    });
+
+    expect(out!.source.sourceName).toBe('Wikimedia Commons');
+    expect(recordImageUsage).toHaveBeenCalledWith(expect.objectContaining({
+      source: 'wikimedia', sourceId: 'https://commons/W',
+    }));
+  });
+
+  it('skips content-hash dupe (intra-article), tries next', async () => {
+    (fetchInlineCandidates as unknown as vi.Mock).mockResolvedValueOnce([fpCand('1'), fpCand('2')]);
+    (isSourceIdUsed as unknown as vi.Mock).mockResolvedValue(false);
+    (isContentHashUsed as unknown as vi.Mock)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+
+    const out = await pickUniqueInline({
+      query: 'q', caption: 'c', articleId: 'art', position: 1, filenameStem: 's-inline-1',
+    });
+
+    expect(out).not.toBeNull();
+  });
+
+  it('returns null when every candidate exhausts', async () => {
+    (fetchInlineCandidates as unknown as vi.Mock).mockResolvedValueOnce([fpCand('1')]);
+    (isSourceIdUsed as unknown as vi.Mock).mockResolvedValue(true);
+
+    const out = await pickUniqueInline({
+      query: 'q', caption: 'c', articleId: 'art', position: 1, filenameStem: 's-inline-1',
+    });
+    expect(out).toBeNull();
   });
 });

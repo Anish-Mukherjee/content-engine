@@ -64,3 +64,56 @@ export async function pickUniqueHero(args: PickHeroArgs): Promise<LocalImage> {
   }
   return getFallbackImage(args.category, args.altText);
 }
+
+import { fetchInlineCandidates, renderInlineFigure } from '../integrations/inline-images';
+import { downloadAndSave } from '../integrations/inline-images/download';
+import type { InlineImageResult } from '../integrations/inline-images';
+
+const INLINE_WIDTH = 800;
+const INLINE_HEIGHT = 450;
+
+export type PickInlineArgs = {
+  query: string;
+  caption: string;
+  articleId: string;
+  position: number;
+  filenameStem: string;
+};
+
+export async function pickUniqueInline(args: PickInlineArgs): Promise<InlineImageResult | null> {
+  const candidates = await fetchInlineCandidates(args.query);
+  for (const cand of candidates) {
+    if (await isSourceIdUsed(cand.source, cand.sourceId)) continue;
+
+    let saved;
+    try {
+      saved = await downloadAndSave(cand.inlineSource.url, args.filenameStem, INLINE_WIDTH, INLINE_HEIGHT);
+    } catch (err) {
+      logger.warn({ err, source: cand.source }, 'inline image download failed; trying next candidate');
+      continue;
+    }
+
+    if (await isContentHashUsed(saved.contentHash)) {
+      try {
+        await fs.unlink(path.join(imagesDir(), `${args.filenameStem}.jpg`));
+      } catch (err) {
+        logger.warn({ err }, 'failed to unlink duplicate inline file');
+      }
+      continue;
+    }
+
+    await recordImageUsage({
+      articleId: args.articleId,
+      role: 'inline', position: args.position,
+      url: saved.url,
+      source: cand.source, sourceId: cand.sourceId,
+      contentHash: saved.contentHash,
+    });
+
+    const figureHtml = renderInlineFigure({
+      localUrl: saved.url, caption: args.caption, source: cand.inlineSource,
+    });
+    return { figureHtml, source: cand.inlineSource, localUrl: saved.url };
+  }
+  return null;
+}

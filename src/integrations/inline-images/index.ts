@@ -16,6 +16,29 @@ export type InlineImageResult = {
   localUrl: string;
 };
 
+export type RenderInlineFigureArgs = {
+  localUrl: string;
+  caption: string;
+  source: InlineImageSource;
+};
+
+export function renderInlineFigure(args: RenderInlineFigureArgs): string {
+  const { localUrl, caption, source } = args;
+  const authorPrefix = source.attribution ? `${escText(source.attribution)} — ` : '';
+  const attributionHtml = source.requiresAttribution
+    ? ` — ${authorPrefix}` +
+      `<a href="${escAttr(source.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escText(source.sourceName)}</a> ` +
+      `(${escText(source.license)})`
+    : '';
+  return (
+    `<figure class="article-image">` +
+    `<img src="${escAttr(localUrl)}" alt="${escAttr(caption)}" ` +
+    `width="${INLINE_WIDTH}" height="${INLINE_HEIGHT}" loading="lazy" />` +
+    `<figcaption>${escText(caption)}${attributionHtml}</figcaption>` +
+    `</figure>`
+  );
+}
+
 // HTML-escape for values we interpolate into attribute strings (caption, alt).
 // Keep it small and specific — sanitize-html handles anything the LLM emits
 // as free text elsewhere, but these attributes bypass the sanitizer.
@@ -114,18 +137,7 @@ export async function resolvePlaceholder(
   // Sources with requiresAttribution=false (e.g. paid Freepik API) get a clean
   // figcaption with just the caption — no author/source/license suffix. CC and
   // free-tier sources keep the full attribution chain.
-  const authorPrefix = source.attribution ? `${escText(source.attribution)} — ` : '';
-  const attributionHtml = source.requiresAttribution
-    ? ` — ${authorPrefix}` +
-      `<a href="${escAttr(source.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escText(source.sourceName)}</a> ` +
-      `(${escText(source.license)})`
-    : '';
-  const figureHtml =
-    `<figure class="article-image">` +
-    `<img src="${escAttr(saved.url)}" alt="${escAttr(caption)}" ` +
-    `width="${INLINE_WIDTH}" height="${INLINE_HEIGHT}" loading="lazy" />` +
-    `<figcaption>${escText(caption)}${attributionHtml}</figcaption>` +
-    `</figure>`;
+  const figureHtml = renderInlineFigure({ localUrl: saved.url, caption, source });
 
   return {
     figureHtml,

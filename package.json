@@ -16,7 +16,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "seed:keywords": "tsx scripts/seed-keywords.ts",
-    "trigger": "tsx scripts/trigger.ts"
+    "trigger": "tsx scripts/trigger.ts",
+    "dedupe:audit": "tsx scripts/audit-duplicate-images.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

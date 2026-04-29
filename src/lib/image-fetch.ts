@@ -12,7 +12,7 @@ import {
 } from '../integrations/unsplash';
 import type { LocalImage, UnsplashPhoto } from '../integrations/unsplash/types';
 import { logger } from './logger';
-import { imagesDir } from './paths';
+import { imagesDir, versionedImageUrl } from './paths';
 
 export type PickHeroArgs = {
   category: Category;
@@ -54,7 +54,7 @@ async function tryHeroCandidate(
     source: 'unsplash', sourceId: photo.id,
     contentHash: hash,
   });
-  return local;
+  return { ...local, url: versionedImageUrl(local.url, hash) };
 }
 
 export async function pickUniqueHero(args: PickHeroArgs): Promise<LocalImage> {
@@ -101,6 +101,7 @@ export async function pickUniqueInline(args: PickInlineArgs): Promise<InlineImag
       continue;
     }
 
+    const versionedUrl = versionedImageUrl(saved.url, saved.contentHash);
     await recordImageUsage({
       articleId: args.articleId,
       role: 'inline', position: args.position,
@@ -110,9 +111,9 @@ export async function pickUniqueInline(args: PickInlineArgs): Promise<InlineImag
     });
 
     const figureHtml = renderInlineFigure({
-      localUrl: saved.url, caption: args.caption, source: cand.inlineSource,
+      localUrl: versionedUrl, caption: args.caption, source: cand.inlineSource,
     });
-    return { figureHtml, source: cand.inlineSource, localUrl: saved.url };
+    return { figureHtml, source: cand.inlineSource, localUrl: versionedUrl };
   }
   return null;
 }

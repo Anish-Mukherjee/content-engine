@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 
 vi.mock('../integrations/inline-images', () => ({
   fetchInlineCandidates: vi.fn(),
@@ -56,8 +56,8 @@ const wmCand = (id: string) => ({
 const candA = { id: 'A', urlRaw: 'u/A', altText: '', photographerName: '', photographerUrl: '', width: 2000, height: 1500 };
 const candB = { id: 'B', urlRaw: 'u/B', altText: '', photographerName: '', photographerUrl: '', width: 2000, height: 1500 };
 
-const localA = { url: '/images/x-hero.jpg', altText: 't', width: 1200, height: 630, photographerName: '', photographerUrl: '', unsplashId: 'A', isFallback: false, contentHash: 'hashA' };
-const localB = { ...localA, unsplashId: 'B', contentHash: 'hashB' };
+const localA = { url: '/images/x-hero.jpg', altText: 't', width: 1200, height: 630, photographerName: '', photographerUrl: '', unsplashId: 'A', isFallback: false, contentHash: 'abcdef0123456789' };
+const localB = { ...localA, unsplashId: 'B', contentHash: 'fedcba9876543210' };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -65,10 +65,10 @@ beforeEach(() => {
     if (photo.id === 'A') return localA;
     return localB;
   });
-  (downloadAndSave as unknown as vi.Mock).mockImplementation(async (url: string, stem: string) => ({
+  (downloadAndSave as unknown as vi.Mock).mockImplementation(async (_url: string, stem: string) => ({
     url: `/images/${stem}.jpg`,
     filename: `${stem}.jpg`,
-    contentHash: `hash-${url}`,
+    contentHash: 'cafebabe12345678',
     bytes: Buffer.from(''),
   }));
 });
@@ -86,7 +86,7 @@ describe('pickUniqueHero', () => {
     expect(out.unsplashId).toBe('A');
     expect(recordImageUsage).toHaveBeenCalledWith(expect.objectContaining({
       articleId: 'art1', role: 'hero', position: null, source: 'unsplash', sourceId: 'A',
-      contentHash: 'hashA',
+      contentHash: 'abcdef0123456789',
     }));
   });
 
@@ -105,7 +105,7 @@ describe('pickUniqueHero', () => {
   it('skips candidate whose content hash is already used, takes next', async () => {
     (searchHeroCandidates as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce([candA, candB]);
     (isSourceIdUsed as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(false);
-    (isContentHashUsed as unknown as ReturnType<typeof vi.fn>).mockImplementation(async (h: string) => h === 'hashA');
+    (isContentHashUsed as unknown as ReturnType<typeof vi.fn>).mockImplementation(async (h: string) => h === 'abcdef0123456789');
 
     const out = await pickUniqueHero({
       category: 'indicators', articleId: 'art1', slug: 's', altText: 't', filenameStem: 's-hero',
@@ -146,7 +146,8 @@ describe('pickUniqueInline', () => {
     });
 
     expect(out).not.toBeNull();
-    expect(out!.localUrl).toBe('/images/s-inline-1.jpg');
+    expect(out!.localUrl).toContain('/images/s-inline-1.jpg');
+    expect(out!.localUrl).toMatch(/\?v=[a-f0-9]{8}$/);
     expect(recordImageUsage).toHaveBeenCalledWith(expect.objectContaining({
       role: 'inline', position: 1, source: 'freepik', sourceId: '1',
     }));
@@ -189,5 +190,60 @@ describe('pickUniqueInline', () => {
       query: 'q', caption: 'c', articleId: 'art', position: 1, filenameStem: 's-inline-1',
     });
     expect(out).toBeNull();
+  });
+});
+
+import { versionedImageUrl } from './paths';
+import { renderInlineFigure } from '../integrations/inline-images';
+
+describe('versionedImageUrl', () => {
+  it('appends ?v= with first 8 hex chars of hash', () => {
+    expect(versionedImageUrl('/images/foo.jpg', 'abcdef0123456789'))
+      .toBe('/images/foo.jpg?v=abcdef01');
+  });
+
+  it('uses & when URL already has a query string', () => {
+    expect(versionedImageUrl('/images/foo.jpg?w=100', 'abcdef0123456789'))
+      .toBe('/images/foo.jpg?w=100&v=abcdef01');
+  });
+
+  it('strips an existing v= param (idempotent)', () => {
+    expect(versionedImageUrl('/images/foo.jpg?v=oldhash', 'newhash00112233'))
+      .toBe('/images/foo.jpg?v=newhash0');
+  });
+
+  it('passes through unchanged when contentHash is empty', () => {
+    expect(versionedImageUrl('/images/foo.jpg', '')).toBe('/images/foo.jpg');
+  });
+});
+
+describe('pickUniqueHero versions the returned URL', () => {
+  it('returned LocalImage.url has ?v=<hash[:8]> appended', async () => {
+    (searchHeroCandidates as unknown as Mock).mockResolvedValueOnce([candA]);
+    (isSourceIdUsed as unknown as Mock).mockResolvedValue(false);
+    (isContentHashUsed as unknown as Mock).mockResolvedValue(false);
+
+    const out = await pickUniqueHero({
+      category: 'indicators', articleId: 'art1', slug: 's', altText: 't', filenameStem: 's-hero',
+    });
+    expect(out.url).toMatch(/\?v=[a-f0-9]{8}$/);
+    expect(out.url).toContain('/images/x-hero.jpg');
+  });
+});
+
+describe('pickUniqueInline versions the rendered figure URL', () => {
+  it('renderInlineFigure receives a versioned localUrl, and result.localUrl is versioned', async () => {
+    (fetchInlineCandidates as unknown as Mock).mockResolvedValueOnce([fpCand('1')]);
+    (isSourceIdUsed as unknown as Mock).mockResolvedValue(false);
+    (isContentHashUsed as unknown as Mock).mockResolvedValue(false);
+
+    const out = await pickUniqueInline({
+      query: 'q', caption: 'c', articleId: 'art', position: 1, filenameStem: 's-inline-1',
+    });
+    expect(out!.localUrl).toMatch(/\?v=[a-f0-9]{8}$/);
+    expect(out!.localUrl).toContain('/images/s-inline-1.jpg');
+    // renderInlineFigure mock receives versioned URL
+    const renderCalls = (renderInlineFigure as unknown as Mock).mock.calls;
+    expect(renderCalls[0][0].localUrl).toMatch(/\?v=[a-f0-9]{8}$/);
   });
 });

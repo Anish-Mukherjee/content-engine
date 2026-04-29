@@ -5,19 +5,32 @@ import { getDownloadUrl, searchImages, type FreepikResource } from './client';
 const MIN_WIDTH = 600;
 const MIN_HEIGHT = 400;
 
-export async function findInlineImage(query: string): Promise<InlineImageSource | null> {
-  const photos = await searchImages(query);
-  if (photos.length === 0) return null;
+export type FreepikCandidate = {
+  sourceId: string;
+  freepik: FreepikResource;
+  url: string;          // download url (signed, ~1h TTL)
+  inlineSource: InlineImageSource;
+};
 
+export async function findInlineCandidates(query: string): Promise<FreepikCandidate[]> {
+  const photos = await searchImages(query);
+  const out: FreepikCandidate[] = [];
   for (const photo of photos) {
     if (!isUsable(photo)) continue;
-    // Resolve the medium-size download URL (1500px wide). Doing this lazily —
-    // only for the first usable candidate — keeps the per-image cost at one
-    // search call + one download call rather than N download calls upfront.
     const downloadUrl = await getDownloadUrl(photo.id);
-    return toInlineImageSource(photo, downloadUrl);
+    out.push({
+      sourceId: String(photo.id),
+      freepik: photo,
+      url: downloadUrl,
+      inlineSource: toInlineImageSource(photo, downloadUrl),
+    });
   }
-  return null;
+  return out;
+}
+
+export async function findInlineImage(query: string): Promise<InlineImageSource | null> {
+  const cands = await findInlineCandidates(query);
+  return cands[0]?.inlineSource ?? null;
 }
 
 function isUsable(photo: FreepikResource): boolean {

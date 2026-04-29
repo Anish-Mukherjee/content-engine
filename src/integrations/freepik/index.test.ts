@@ -6,7 +6,7 @@ vi.mock('./client', () => ({
   getDownloadUrl: vi.fn(),
 }));
 
-import { findInlineImage } from './index';
+import { findInlineImage, findInlineCandidates } from './index';
 import { getDownloadUrl, searchImages } from './client';
 
 describe('freepik integration', () => {
@@ -138,15 +138,63 @@ describe('freepik integration', () => {
     expect(result?.requiresAttribution).toBe(false);
   });
 
-  it('only calls getDownloadUrl once (for the first usable candidate)', async () => {
+  it('returns the first usable candidate (getDownloadUrl called for each usable photo via findInlineCandidates)', async () => {
     (searchImages as unknown as vi.Mock).mockResolvedValueOnce([
       makePhoto({ id: 1 }),
       makePhoto({ id: 2 }),
       makePhoto({ id: 3 }),
     ]);
-    (getDownloadUrl as unknown as vi.Mock).mockResolvedValueOnce('https://img.freepik.com/x.jpg');
-    await findInlineImage('q');
-    expect(getDownloadUrl).toHaveBeenCalledTimes(1);
+    (getDownloadUrl as unknown as vi.Mock)
+      .mockResolvedValueOnce('https://img.freepik.com/x1.jpg')
+      .mockResolvedValueOnce('https://img.freepik.com/x2.jpg')
+      .mockResolvedValueOnce('https://img.freepik.com/x3.jpg');
+    const result = await findInlineImage('q');
+    expect(result?.url).toBe('https://img.freepik.com/x1.jpg');
+    expect(getDownloadUrl).toHaveBeenCalledTimes(3);
     expect(getDownloadUrl).toHaveBeenCalledWith(1);
+  });
+});
+
+describe('findInlineCandidates', () => {
+  beforeEach(() => {
+    (searchImages as unknown as vi.Mock).mockReset();
+    (getDownloadUrl as unknown as vi.Mock).mockReset();
+  });
+
+  it('returns one candidate per usable photo with stable resourceId', async () => {
+    (searchImages as unknown as vi.Mock).mockResolvedValueOnce([
+      { id: 1, title: 'p1', url: 'https://f/1', filename: 'a',
+        licenses: [], image: { type: 'photo', orientation: 'horizontal',
+          source: { key: 'large', url: 'https://i/1', size: '800x500' } },
+        author: { id: 9, name: 'a', slug: 'a', avatar: '', assets: 0 } },
+      { id: 2, title: 'p2', url: 'https://f/2', filename: 'b',
+        licenses: [], image: { type: 'photo', orientation: 'horizontal',
+          source: { key: 'large', url: 'https://i/2', size: '800x500' } },
+        author: { id: 9, name: 'a', slug: 'a', avatar: '', assets: 0 } },
+    ]);
+    (getDownloadUrl as unknown as vi.Mock)
+      .mockResolvedValueOnce('https://dl/1')
+      .mockResolvedValueOnce('https://dl/2');
+
+    const out = await findInlineCandidates('q');
+    expect(out).toHaveLength(2);
+    expect(out[0].sourceId).toBe('1');
+    expect(out[0].url).toBe('https://dl/1');
+    expect(out[1].sourceId).toBe('2');
+  });
+
+  it('skips non-photo and undersized images', async () => {
+    (searchImages as unknown as vi.Mock).mockResolvedValueOnce([
+      { id: 1, title: 't', url: '', filename: '', licenses: [],
+        image: { type: 'vector', orientation: 'horizontal',
+          source: { key: 'large', url: '', size: '800x500' } },
+        author: { id: 0, name: '', slug: '', avatar: '', assets: 0 } },
+      { id: 2, title: 't', url: '', filename: '', licenses: [],
+        image: { type: 'photo', orientation: 'horizontal',
+          source: { key: 'large', url: '', size: '400x300' } },
+        author: { id: 0, name: '', slug: '', avatar: '', assets: 0 } },
+    ]);
+    const out = await findInlineCandidates('q');
+    expect(out).toEqual([]);
   });
 });

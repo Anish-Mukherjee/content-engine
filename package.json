@@ -18,7 +18,8 @@
     "seed:keywords": "tsx scripts/seed-keywords.ts",
     "trigger": "tsx scripts/trigger.ts",
     "dedupe:audit": "tsx scripts/audit-duplicate-images.ts",
-    "dedupe:backfill": "tsx scripts/backfill-image-usage.ts"
+    "dedupe:backfill": "tsx scripts/backfill-image-usage.ts",
+    "dedupe:run": "tsx scripts/dedupe-existing-images.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

@@ -4,9 +4,7 @@ import { eq } from 'drizzle-orm';
 import { isCategory, type Category } from '../config/categories';
 import { db } from '../db/client';
 import { articles } from '../db/schema';
-import { resolvePlaceholder } from '../integrations/inline-images';
-import { downloadAndCrop, getFallbackImage, searchHeroImage } from '../integrations/unsplash';
-import type { LocalImage } from '../integrations/unsplash/types';
+import { pickUniqueHero, pickUniqueInline } from '../lib/image-fetch';
 import { TerminalError } from '../lib/errors';
 import {
   findInlineImagePlaceholders,
@@ -25,8 +23,10 @@ export async function fetchImage(articleId: string): Promise<void> {
   await db().update(articles).set({ status: 'fetching_image' }).where(eq(articles.id, articleId));
 
   const altText = article.title || article.slug;
-  const hero = await fetchHero(articleId, article.slug, category, altText);
-  const processedHtml = await processInlinePlaceholders(article.articleHtml ?? '', article.slug);
+  const hero = await pickUniqueHero({
+    category, articleId, slug: article.slug, altText, filenameStem: `${article.slug}-hero`,
+  });
+  const processedHtml = await processInlinePlaceholders(article.articleHtml ?? '', article.slug, articleId);
 
   await db().update(articles).set({
     status: 'image_ready',
@@ -36,23 +36,9 @@ export async function fetchImage(articleId: string): Promise<void> {
   }).where(eq(articles.id, articleId));
 }
 
-async function fetchHero(
-  articleId: string,
-  slug: string,
-  category: Category,
-  altText: string,
-): Promise<LocalImage> {
-  try {
-    const photo = await searchHeroImage(category);
-    if (photo) return await downloadAndCrop(photo, slug, altText);
-    return getFallbackImage(category, altText);
-  } catch (err) {
-    logger.warn({ err, articleId }, 'hero image fetch failed; using category fallback');
-    return getFallbackImage(category, altText);
-  }
-}
-
-async function processInlinePlaceholders(articleHtml: string, slug: string): Promise<string> {
+async function processInlinePlaceholders(
+  articleHtml: string, slug: string, articleId: string,
+): Promise<string> {
   if (!articleHtml) return articleHtml;
 
   const placeholders = findInlineImagePlaceholders(articleHtml);
@@ -63,18 +49,17 @@ async function processInlinePlaceholders(articleHtml: string, slug: string): Pro
     const placeholder = placeholders[i];
     const filenameStem = `${slug}-inline-${i + 1}`;
     try {
-      const resolved = await resolvePlaceholder(placeholder.query, placeholder.caption, filenameStem);
+      const resolved = await pickUniqueInline({
+        query: placeholder.query, caption: placeholder.caption,
+        articleId, position: i + 1, filenameStem,
+      });
       if (!resolved) {
-        // Both Google and Wikimedia returned nothing. Strip the placeholder
-        // so it doesn't render as an empty div on the page.
         html = replacePlaceholder(html, placeholder, '');
         logger.info({ query: placeholder.query }, 'no inline image source found; placeholder removed');
         continue;
       }
       html = replacePlaceholder(html, placeholder, resolved.figureHtml);
     } catch (err) {
-      // Per the spec: image failures must never block the pipeline. Remove
-      // the placeholder and keep going.
       logger.warn({ err, query: placeholder.query }, 'inline image resolve failed; placeholder removed');
       html = replacePlaceholder(html, placeholder, '');
     }

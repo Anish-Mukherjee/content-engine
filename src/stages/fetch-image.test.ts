@@ -5,34 +5,29 @@ import { db, closeDb } from '../db/client';
 import { articles } from '../db/schema';
 import { fetchImage } from './fetch-image';
 
-vi.mock('../integrations/unsplash', () => ({
-  searchHeroImage: vi.fn(),
-  downloadAndCrop: vi.fn(),
-  getFallbackImage: vi.fn(),
-}));
-vi.mock('../integrations/inline-images', () => ({
-  resolvePlaceholder: vi.fn(),
+vi.mock('../lib/image-fetch', () => ({
+  pickUniqueHero: vi.fn(),
+  pickUniqueInline: vi.fn(),
 }));
 
-import { searchHeroImage, downloadAndCrop, getFallbackImage } from '../integrations/unsplash';
-import { resolvePlaceholder } from '../integrations/inline-images';
+import { pickUniqueHero, pickUniqueInline } from '../lib/image-fetch';
 
 const HERO = {
   url: '/images/post-1-hero.jpg', altText: 'alt', width: 1200, height: 630,
-  photographerName: 'J', photographerUrl: 'https://u/@j', unsplashId: 'abc', isFallback: false,
+  photographerName: 'J', photographerUrl: 'https://u/@j', unsplashId: 'abc',
+  isFallback: false, contentHash: 'h1',
 };
 const FALLBACK = {
   url: '/images/fallbacks/exchanges.jpg', altText: '', width: 1200, height: 630,
-  photographerName: null, photographerUrl: null, unsplashId: null, isFallback: true,
+  photographerName: null, photographerUrl: null, unsplashId: null,
+  isFallback: true, contentHash: null,
 };
 
 describe('fetchImage', () => {
   beforeEach(async () => {
     await db().execute(sql`TRUNCATE TABLE articles CASCADE`);
-    (searchHeroImage as unknown as vi.Mock).mockReset();
-    (downloadAndCrop as unknown as vi.Mock).mockReset();
-    (getFallbackImage as unknown as vi.Mock).mockReset();
-    (resolvePlaceholder as unknown as vi.Mock).mockReset();
+    (pickUniqueHero as unknown as vi.Mock).mockReset();
+    (pickUniqueInline as unknown as vi.Mock).mockReset();
   });
   afterAll(async () => { await closeDb(); });
 
@@ -41,12 +36,7 @@ describe('fetchImage', () => {
       keyword: 'k', category: 'exchanges', status: 'written', slug: 'post-1',
       articleHtml: '<h2>Heading</h2><p>body</p>',
     }).returning();
-    (searchHeroImage as unknown as vi.Mock).mockResolvedValueOnce({
-      id: 'abc', urlRaw: 'https://u/raw.jpg', altText: 'alt',
-      photographerName: 'J', photographerUrl: 'https://u/@j',
-      width: 4000, height: 3000,
-    });
-    (downloadAndCrop as unknown as vi.Mock).mockResolvedValueOnce(HERO);
+    (pickUniqueHero as unknown as vi.Mock).mockResolvedValueOnce(HERO);
 
     await fetchImage(a.id);
 
@@ -55,7 +45,7 @@ describe('fetchImage', () => {
     const hero = row.heroImage as { url: string; isFallback: boolean };
     expect(hero.url).toBe('/images/post-1-hero.jpg');
     expect(hero.isFallback).toBe(false);
-    expect(resolvePlaceholder).not.toHaveBeenCalled();
+    expect(pickUniqueInline).not.toHaveBeenCalled();
   });
 
   it('replaces inline image placeholders with <figure> HTML', async () => {
@@ -67,13 +57,8 @@ describe('fetchImage', () => {
       keyword: 'k', category: 'exchanges', status: 'written', slug: 'post-2',
       articleHtml: html,
     }).returning();
-    (searchHeroImage as unknown as vi.Mock).mockResolvedValueOnce({
-      id: 'abc', urlRaw: 'https://u/raw.jpg', altText: '',
-      photographerName: 'J', photographerUrl: 'https://u/@j',
-      width: 4000, height: 3000,
-    });
-    (downloadAndCrop as unknown as vi.Mock).mockResolvedValueOnce(HERO);
-    (resolvePlaceholder as unknown as vi.Mock).mockResolvedValueOnce({
+    (pickUniqueHero as unknown as vi.Mock).mockResolvedValueOnce(HERO);
+    (pickUniqueInline as unknown as vi.Mock).mockResolvedValueOnce({
       figureHtml: '<figure class="article-image"><img src="https://cdn.example/inline.jpg" alt="Bybit interface" width="800" height="450" loading="lazy" /><figcaption>Bybit interface — <a href="https://example.com" target="_blank" rel="noopener noreferrer">example.com</a> (Creative Commons)</figcaption></figure>',
       localUrl: '/images/post-2-inline-1.jpg',
       source: { url: 'x', sourceName: 'example.com', sourceUrl: 'https://example.com', altText: '', width: 800, height: 450, license: 'CC', attribution: null, requiresAttribution: true },
@@ -86,7 +71,10 @@ describe('fetchImage', () => {
     expect(row.articleHtml).toContain('<figure class="article-image">');
     expect(row.articleHtml).toContain('src="https://cdn.example/inline.jpg"');
     expect(row.articleHtml).not.toContain('inline-image-placeholder');
-    expect(resolvePlaceholder).toHaveBeenCalledWith('bybit interface', 'Bybit interface', 'post-2-inline-1');
+    expect(pickUniqueInline).toHaveBeenCalledWith({
+      query: 'bybit interface', caption: 'Bybit interface',
+      articleId: a.id, position: 1, filenameStem: 'post-2-inline-1',
+    });
   });
 
   it('strips placeholder when no inline image source is found (both Google and Wikimedia miss)', async () => {
@@ -98,12 +86,8 @@ describe('fetchImage', () => {
       keyword: 'k', category: 'exchanges', status: 'written', slug: 'post-3',
       articleHtml: html,
     }).returning();
-    (searchHeroImage as unknown as vi.Mock).mockResolvedValueOnce({
-      id: 'abc', urlRaw: 'https://u/raw.jpg', altText: '',
-      photographerName: 'J', photographerUrl: 'https://u/@j', width: 4000, height: 3000,
-    });
-    (downloadAndCrop as unknown as vi.Mock).mockResolvedValueOnce(HERO);
-    (resolvePlaceholder as unknown as vi.Mock).mockResolvedValueOnce(null);
+    (pickUniqueHero as unknown as vi.Mock).mockResolvedValueOnce(HERO);
+    (pickUniqueInline as unknown as vi.Mock).mockResolvedValueOnce(null);
 
     await fetchImage(a.id);
 
@@ -122,9 +106,8 @@ describe('fetchImage', () => {
       keyword: 'k', category: 'exchanges', status: 'written', slug: 'post-4',
       articleHtml: html,
     }).returning();
-    (searchHeroImage as unknown as vi.Mock).mockResolvedValueOnce(null);
-    (getFallbackImage as unknown as vi.Mock).mockReturnValueOnce(FALLBACK);
-    (resolvePlaceholder as unknown as vi.Mock).mockRejectedValueOnce(new Error('boom'));
+    (pickUniqueHero as unknown as vi.Mock).mockResolvedValueOnce(FALLBACK);
+    (pickUniqueInline as unknown as vi.Mock).mockRejectedValueOnce(new Error('boom'));
 
     await fetchImage(a.id);
 
@@ -138,8 +121,7 @@ describe('fetchImage', () => {
       keyword: 'k', category: 'exchanges', status: 'written', slug: 'post-5',
       articleHtml: '<p>no placeholders</p>',
     }).returning();
-    (searchHeroImage as unknown as vi.Mock).mockResolvedValueOnce(null);
-    (getFallbackImage as unknown as vi.Mock).mockReturnValueOnce(FALLBACK);
+    (pickUniqueHero as unknown as vi.Mock).mockResolvedValueOnce(FALLBACK);
 
     await fetchImage(a.id);
 
@@ -154,12 +136,28 @@ describe('fetchImage', () => {
       keyword: 'k', category: 'exchanges', status: 'written', slug: 'post-6',
       articleHtml: '<p>x</p>',
     }).returning();
-    (searchHeroImage as unknown as vi.Mock).mockRejectedValueOnce(new Error('unsplash down'));
-    (getFallbackImage as unknown as vi.Mock).mockReturnValueOnce(FALLBACK);
+    (pickUniqueHero as unknown as vi.Mock).mockResolvedValueOnce(FALLBACK);
 
     await fetchImage(a.id);
 
     const [row] = await db().select().from(articles).where(eq(articles.id, a.id));
     expect(row.status).toBe('image_ready');
+  });
+
+  it('passes articleId + slug + filenameStem to pickUniqueHero', async () => {
+    const [a] = await db().insert(articles).values({
+      keyword: 'k', category: 'indicators', status: 'written',
+      slug: 'my-slug', title: 'My Title', articleHtml: '<p>hi</p>',
+    }).returning();
+    (pickUniqueHero as unknown as vi.Mock).mockResolvedValueOnce({
+      url: '/images/my-slug-hero.jpg', altText: 'My Title', width: 1200, height: 630,
+      photographerName: null, photographerUrl: null, unsplashId: null,
+      isFallback: false, contentHash: 'h',
+    });
+    await fetchImage(a.id);
+    expect(pickUniqueHero).toHaveBeenCalledWith({
+      category: 'indicators', articleId: a.id, slug: 'my-slug',
+      altText: 'My Title', filenameStem: 'my-slug-hero',
+    });
   });
 });

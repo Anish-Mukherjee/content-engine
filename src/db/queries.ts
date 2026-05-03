@@ -1,8 +1,22 @@
 // src/db/queries.ts
-import { and, asc, eq, lt, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, lt, sql } from 'drizzle-orm';
 
+import { CLUSTER_COOLDOWN_DAYS, clusterTags, intersects } from '../config/topic-clusters';
 import { db } from './client';
 import { articles, imageUsage } from './schema';
+
+export async function getCooldownClusters(daysAgo: number = CLUSTER_COOLDOWN_DAYS): Promise<Set<string>> {
+  const cutoff = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
+  const recent = await db()
+    .select({ keyword: articles.keyword })
+    .from(articles)
+    .where(and(eq(articles.status, 'published'), gte(articles.publishedAt, cutoff)));
+  const result = new Set<string>();
+  for (const r of recent) {
+    for (const t of clusterTags(r.keyword)) result.add(t);
+  }
+  return result;
+}
 
 export async function pickNextDrivable() {
   const [retryable] = await db()
@@ -27,7 +41,14 @@ export async function pickNextDrivable() {
   // updated_at. The next pick in the same tick sees that category as just-touched
   // and moves to a different one — so a 2-articles-per-day batch hits two
   // distinct categories instead of two from the same backlog cluster.
-  const [pending] = await db().execute<typeof articles.$inferSelect>(sql`
+  //
+  // Topic-cluster cooldown: candidates whose keyword is in a cluster that's
+  // been published within CLUSTER_COOLDOWN_DAYS are skipped. This prevents
+  // "another bot article" / "another rsi article" / "another bybit article"
+  // from running back-to-back even when their signatures differ.
+  const cooldown = await getCooldownClusters();
+
+  const candidates = await db().execute<typeof articles.$inferSelect>(sql`
     SELECT a.*
     FROM articles a
     LEFT JOIN (
@@ -42,9 +63,13 @@ export async function pickNextDrivable() {
     ) cl ON cl.category = a.category
     WHERE a.status = 'pending'
     ORDER BY cl.last_activity ASC NULLS FIRST, a.created_at ASC
-    LIMIT 1
   `);
-  return pending;
+
+  for (const c of candidates) {
+    if (intersects(clusterTags(c.keyword), cooldown)) continue;
+    return c;
+  }
+  return undefined;
 }
 
 export async function getArticle(id: string) {

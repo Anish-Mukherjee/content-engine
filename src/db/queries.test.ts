@@ -112,6 +112,55 @@ describe('queries', () => {
     expect(picked?.id).toBe(first.id);
   });
 
+  it('pickNextDrivable skips clusters that have been published within cooldown window', async () => {
+    // Recently-published bot article puts the bot cluster in cooldown.
+    await db().insert(articles).values({
+      keyword: 'ai bots for trading', category: 'automation', status: 'published',
+      slug: 'ai-bots-for-trading',
+      publishedAt: new Date(),
+    });
+    // Pending bot article (same cluster) — should be skipped.
+    await db().insert(articles).values({
+      keyword: 'best crypto trading bot for beginners', category: 'automation', status: 'pending',
+      createdAt: new Date('2026-04-23T13:00:00Z'),
+    });
+    // Pending non-bot article — should win.
+    const [winner] = await db().insert(articles).values({
+      keyword: 'crypto market structure', category: 'analysis', status: 'pending',
+      createdAt: new Date('2026-04-23T13:30:00Z'),
+    }).returning();
+
+    const picked = await pickNextDrivable();
+    expect(picked?.id).toBe(winner.id);
+  });
+
+  it('pickNextDrivable returns undefined when every candidate is in a cooldown cluster', async () => {
+    await db().insert(articles).values({
+      keyword: 'ai bots for trading', category: 'automation', status: 'published',
+      slug: 'ai-bots-for-trading',
+      publishedAt: new Date(),
+    });
+    await db().insert(articles).values({
+      keyword: 'best crypto trading bot for beginners', category: 'automation', status: 'pending',
+    });
+    const picked = await pickNextDrivable();
+    expect(picked).toBeUndefined();
+  });
+
+  it('pickNextDrivable picks bot pending again once the bot cluster cooldown has expired', async () => {
+    // Bot was published 30 days ago — well outside the 14-day cooldown.
+    const longAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    await db().insert(articles).values({
+      keyword: 'ai bots for trading', category: 'automation', status: 'published',
+      slug: 'ai-bots-old', publishedAt: longAgo, createdAt: longAgo,
+    });
+    const [bot] = await db().insert(articles).values({
+      keyword: 'best crypto trading bot for beginners', category: 'automation', status: 'pending',
+    }).returning();
+    const picked = await pickNextDrivable();
+    expect(picked?.id).toBe(bot.id);
+  });
+
   it('pickNextDrivable rotates within a single tick: an in-flight row pushes its category back', async () => {
     // Two categories, both have NULL last-activity (never published, no in-flight).
     const [coinA] = await db().insert(articles).values({

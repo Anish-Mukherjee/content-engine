@@ -27,7 +27,7 @@ const STOP_WORDS = new Set([
 // Multi-word phrases collapsed to a single canonical token before tokenisation.
 const PHRASE_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\bartificial\s+intelligence\b/gi, 'ai'],
-  [/\bcrypto\s*currency\b/gi, 'crypto'],
+  [/\bcrypto\s*currenc(?:y|ies)\b/gi, 'crypto'],
   [/\bdouble\s+top\b/gi, 'doubletop'],
   [/\bdouble\s+bottom\b/gi, 'doublebottom'],
   [/\bhead\s+and\s+shoulders\b/gi, 'headshoulders'],
@@ -96,6 +96,22 @@ const ALIASES: Record<string, string> = {
   ltc: 'litecoin',
 };
 
+// Crude singular form. Handles plain plurals (trends → trend, rates → rate)
+// and -ies → -y (industries → industry). Conservative: only applies to 4+ char
+// tokens, and skips tokens ending in 'ss' (address), 'us' (bonus, focus),
+// 'is' (analysis, basis) so we don't mangle non-plurals.
+function lemma(token: string): string {
+  if (token.length <= 3) return token;
+  if (token.endsWith('ies')) return `${token.slice(0, -3)}y`;
+  if (token.endsWith('s')
+    && !token.endsWith('ss')
+    && !token.endsWith('us')
+    && !token.endsWith('is')) {
+    return token.slice(0, -1);
+  }
+  return token;
+}
+
 export function signature(keyword: string): string {
   let s = keyword.toLowerCase().trim();
   for (const [pattern, replacement] of PHRASE_REPLACEMENTS) {
@@ -104,8 +120,11 @@ export function signature(keyword: string): string {
 
   const tokens = s.split(/[^a-z0-9]+/).filter(Boolean);
 
+  // Order matters: explicit ALIASES win over heuristic plural-stripping, so
+  // e.g. "bots" → ALIAS → "bot" stays "bot" (lemma is a no-op on 3-char tokens).
   const canonical = tokens
     .map((t) => ALIASES[t] ?? t)
+    .map(lemma)
     .filter((t) => !STOP_WORDS.has(t));
 
   return Array.from(new Set(canonical)).sort().join(' ');

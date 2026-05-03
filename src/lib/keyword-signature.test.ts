@@ -82,4 +82,23 @@ describe('keyword signature', () => {
   it('returns empty string for keyword that is all stop-words', () => {
     expect(signature('best of the')).toBe('');
   });
+
+  it('lemmatizes generic plural-s tokens not covered by aliases', () => {
+    expect(signature('crypto market trends')).toBe(signature('crypto market trend'));
+    expect(signature('crypto funding rates')).toBe(signature('crypto funding rate'));
+    expect(signature('crypto take profit levels')).toBe(signature('crypto take profit level'));
+    expect(signature('best cryptos to day trade')).toBe(signature('best crypto for day trading'));
+  });
+
+  it('lemmatizes -ies → -y plurals', () => {
+    expect(signature('crypto industries')).toBe(signature('crypto industry'));
+    expect(signature('crypto currencies')).toBe(signature('crypto currency'));
+  });
+
+  it('does not over-strip non-plural words ending in s', () => {
+    expect(signature('crypto basis trade')).not.toBe(signature('crypto bas trade'));
+    expect(signature('crypto analysis')).not.toBe(signature('crypto analysi'));
+    expect(signature('crypto address')).not.toBe(signature('crypto addres'));
+    expect(signature('crypto bonus')).not.toBe(signature('crypto bonu'));
+  });
 });

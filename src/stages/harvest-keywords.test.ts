@@ -150,6 +150,35 @@ describe('harvestKeywords', () => {
     expect(arstSigs.has('macd crypto strategy')).toBe(true);
   });
 
+  it('filters new keywords whose topic cluster has a recent published article', async () => {
+    await seedPendingTask();
+    // Recently-published bot article puts the bot cluster in cooldown.
+    await db().insert(articles).values({
+      keyword: 'ai bots for trading', category: 'automation', status: 'published',
+      slug: 'ai-bots-for-trading', publishedAt: new Date(),
+    });
+    (fetchTaskResult as unknown as vi.Mock).mockResolvedValueOnce({
+      complete: true,
+      results: [
+        // Same cluster (bot), but distinct signature — must be cluster-filtered.
+        { keyword: 'best crypto trading bot for beginners', searchVolume: 500, competition: 0.3, cpc: 1, keywordDifficulty: 40, trend: 'stable' },
+        // Different cluster (rsi) — must pass through.
+        { keyword: 'rsi divergence crypto', searchVolume: 600, competition: 0.4, cpc: 1, keywordDifficulty: 40, trend: 'stable' },
+      ],
+    });
+    (checkRelevance as unknown as vi.Mock).mockResolvedValueOnce([true]); // only one should reach Pass 3
+
+    await harvestKeywords();
+
+    const cluster = await db().select().from(keywordResults)
+      .where(sql`${keywordResults.keyword} = 'best crypto trading bot for beginners'`);
+    expect(cluster[0].status).toBe('cluster_saturated');
+
+    const passed = await db().select().from(keywordResults)
+      .where(sql`${keywordResults.keyword} = 'rsi divergence crypto'`);
+    expect(passed[0].status).toBe('approved');
+  });
+
   it('filters signature duplicates against already-approved keyword_results', async () => {
     const { task, seed } = await seedPendingTask();
     // Pre-existing approved kr (e.g. from a prior run) for "crypto trading bot"

@@ -1,5 +1,5 @@
 // src/stages/harvest-keywords.ts
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, sql } from 'drizzle-orm';
 
 import { BRAND } from '../config/brand';
 import { isCategory, type Category } from '../config/categories';
@@ -9,6 +9,7 @@ import { articles, dataforseoTasks, keywordResults, seedKeywords } from '../db/s
 import { checkRelevance } from '../integrations/claude';
 import { fetchTaskResult } from '../integrations/dataforseo';
 import { signature } from '../lib/keyword-signature';
+import { CLUSTER_COOLDOWN_DAYS, clusterTags, intersects } from '../config/topic-clusters';
 import { logger } from '../lib/logger';
 
 const RELEVANCE_BATCH_SIZE = 20;
@@ -148,6 +149,44 @@ async function applyPass2Filters(ids: string[]) {
   // exact-string match misses (e.g. "crypto trading bot" vs "trading bot crypto").
   // A single seed keyword on DataForSEO can return 60+ such permutations.
   await applySignatureDedup(ids);
+
+  // 2c — Topic-cluster cooldown. Even when a candidate's signature is unique,
+  // if its content cluster (e.g. trading bots, RSI, Bybit) was published in
+  // the last CLUSTER_COOLDOWN_DAYS days the candidate is filtered. Stops a
+  // single broad topic (e.g. "trading bot") from dominating the feed via
+  // modifier permutations (ai bot / crypto bot / beginner bot / day bot).
+  await applyClusterCooldownFilter(ids);
+}
+
+async function applyClusterCooldownFilter(ids: string[]) {
+  const candidates = await db()
+    .select({ id: keywordResults.id, keyword: keywordResults.keyword })
+    .from(keywordResults)
+    .where(and(inArray(keywordResults.id, ids), eq(keywordResults.status, 'pending_filter')));
+  if (candidates.length === 0) return;
+
+  const cutoff = new Date(Date.now() - CLUSTER_COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
+  const recent = await db()
+    .select({ keyword: articles.keyword })
+    .from(articles)
+    .where(and(eq(articles.status, 'published'), gte(articles.publishedAt, cutoff)));
+
+  const cooldown = new Set<string>();
+  for (const r of recent) for (const t of clusterTags(r.keyword)) cooldown.add(t);
+  if (cooldown.size === 0) return;
+
+  for (const c of candidates) {
+    if (intersects(clusterTags(c.keyword), cooldown)) {
+      await db()
+        .update(keywordResults)
+        .set({
+          status: 'cluster_saturated',
+          processedAt: new Date(),
+          filterReason: `topic cluster published within last ${CLUSTER_COOLDOWN_DAYS} days`,
+        })
+        .where(eq(keywordResults.id, c.id));
+    }
+  }
 }
 
 async function applySignatureDedup(ids: string[]) {

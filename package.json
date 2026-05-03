@@ -20,7 +20,8 @@
     "dedupe:audit": "tsx scripts/audit-duplicate-images.ts",
     "dedupe:backfill": "tsx scripts/backfill-image-usage.ts",
     "dedupe:run": "tsx scripts/dedupe-existing-images.ts",
-    "dedupe:version-urls": "tsx scripts/version-image-urls.ts"
+    "dedupe:version-urls": "tsx scripts/version-image-urls.ts",
+    "dedupe:pending": "tsx scripts/dedupe-pending-articles.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

@@ -18,12 +18,23 @@ export async function pickNextDrivable() {
     .limit(1);
   if (retryable) return retryable;
 
-  const [pending] = await db()
-    .select()
-    .from(articles)
-    .where(eq(articles.status, 'pending'))
-    .orderBy(asc(articles.createdAt))
-    .limit(1);
+  // Round-robin across categories. Pick the category whose most recent published
+  // article is oldest (NULLS first → never-published categories win), then the
+  // oldest pending row within that category. Without this, a single huge harvest
+  // batch in one category dominates the queue for weeks under strict FIFO.
+  const [pending] = await db().execute<typeof articles.$inferSelect>(sql`
+    SELECT a.*
+    FROM articles a
+    LEFT JOIN (
+      SELECT category, MAX(published_at) AS last_published
+      FROM articles
+      WHERE status = 'published'
+      GROUP BY category
+    ) cl ON cl.category = a.category
+    WHERE a.status = 'pending'
+    ORDER BY cl.last_published ASC NULLS FIRST, a.created_at ASC
+    LIMIT 1
+  `);
   return pending;
 }
 

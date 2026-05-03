@@ -1,6 +1,6 @@
 // src/db/queries.test.ts
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { db, closeDb } from './client';
 import { articles } from './schema';
 import { pickNextDrivable, getArticle, markFailed } from './queries';
@@ -110,6 +110,33 @@ describe('queries', () => {
     });
     const picked = await pickNextDrivable();
     expect(picked?.id).toBe(first.id);
+  });
+
+  it('pickNextDrivable rotates within a single tick: an in-flight row pushes its category back', async () => {
+    // Two categories, both have NULL last-activity (never published, no in-flight).
+    const [coinA] = await db().insert(articles).values({
+      keyword: 'btc futures', category: 'coins', status: 'pending',
+      createdAt: new Date('2026-04-23T13:00:00Z'),
+    }).returning();
+    await db().insert(articles).values({
+      keyword: 'eth futures', category: 'coins', status: 'pending',
+      createdAt: new Date('2026-04-23T13:01:00Z'),
+    });
+    const [eduA] = await db().insert(articles).values({
+      keyword: 'how to trade', category: 'education', status: 'pending',
+      createdAt: new Date('2026-04-23T13:30:00Z'),
+    }).returning();
+
+    // Pick 1: oldest createdAt across NULL-last-activity categories → coinA
+    const pick1 = await pickNextDrivable();
+    expect(pick1?.id).toBe(coinA.id);
+
+    // Simulate driveArticle starting research — bumps coins category's last-activity.
+    await db().update(articles).set({ status: 'researching' }).where(eq(articles.id, pick1!.id));
+
+    // Pick 2: coins now has recent in-flight activity, education still NULL → education wins.
+    const pick2 = await pickNextDrivable();
+    expect(pick2?.id).toBe(eduA.id);
   });
 
   it('markFailed sets status, increments retryCount, records lastError', async () => {

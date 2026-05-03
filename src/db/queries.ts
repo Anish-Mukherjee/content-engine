@@ -18,21 +18,30 @@ export async function pickNextDrivable() {
     .limit(1);
   if (retryable) return retryable;
 
-  // Round-robin across categories. Pick the category whose most recent published
-  // article is oldest (NULLS first → never-published categories win), then the
-  // oldest pending row within that category. Without this, a single huge harvest
-  // batch in one category dominates the queue for weeks under strict FIFO.
+  // Round-robin across categories. Pick the category whose most recent activity
+  // (= max of `published_at` for published rows OR `updated_at` for any in-flight
+  // row) is oldest. NULLS first → never-touched categories win.
+  //
+  // Why both timestamps: this also rotates *within* a single driveDailyBatch
+  // tick. driveArticle transitions a pending row to 'researching', bumping
+  // updated_at. The next pick in the same tick sees that category as just-touched
+  // and moves to a different one — so a 2-articles-per-day batch hits two
+  // distinct categories instead of two from the same backlog cluster.
   const [pending] = await db().execute<typeof articles.$inferSelect>(sql`
     SELECT a.*
     FROM articles a
     LEFT JOIN (
-      SELECT category, MAX(published_at) AS last_published
+      SELECT
+        category,
+        GREATEST(
+          MAX(published_at) FILTER (WHERE status = 'published'),
+          MAX(updated_at) FILTER (WHERE status NOT IN ('pending', 'cancelled', 'published'))
+        ) AS last_activity
       FROM articles
-      WHERE status = 'published'
       GROUP BY category
     ) cl ON cl.category = a.category
     WHERE a.status = 'pending'
-    ORDER BY cl.last_published ASC NULLS FIRST, a.created_at ASC
+    ORDER BY cl.last_activity ASC NULLS FIRST, a.created_at ASC
     LIMIT 1
   `);
   return pending;

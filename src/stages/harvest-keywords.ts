@@ -8,6 +8,7 @@ import { db } from '../db/client';
 import { articles, dataforseoTasks, keywordResults, seedKeywords } from '../db/schema';
 import { checkRelevance } from '../integrations/claude';
 import { fetchTaskResult } from '../integrations/dataforseo';
+import { signature } from '../lib/keyword-signature';
 import { logger } from '../lib/logger';
 
 const RELEVANCE_BATCH_SIZE = 20;
@@ -115,6 +116,7 @@ async function applyPass1Filters(ids: string[]) {
 }
 
 async function applyPass2Filters(ids: string[]) {
+  // 2a — Exact-string dedup (cheap, also gives precise filter_reason).
   // Duplicate against published articles
   await db().execute(sql`
     UPDATE keyword_results kr SET status='duplicate_published', processed_at=NOW(),
@@ -141,6 +143,57 @@ async function applyPass2Filters(ids: string[]) {
       AND EXISTS (SELECT 1 FROM keyword_results kr2
                    WHERE kr2.keyword=kr.keyword AND kr2.id<>kr.id AND kr2.status='approved')
   `);
+
+  // 2b — Token-set signature dedup. Catches word-permutations and synonyms that
+  // exact-string match misses (e.g. "crypto trading bot" vs "trading bot crypto").
+  // A single seed keyword on DataForSEO can return 60+ such permutations.
+  await applySignatureDedup(ids);
+}
+
+async function applySignatureDedup(ids: string[]) {
+  const candidates = await db()
+    .select({ id: keywordResults.id, keyword: keywordResults.keyword })
+    .from(keywordResults)
+    .where(and(inArray(keywordResults.id, ids), eq(keywordResults.status, 'pending_filter')));
+  if (candidates.length === 0) return;
+
+  const occupiedArticles = await db()
+    .select({ keyword: articles.keyword })
+    .from(articles)
+    .where(sql`${articles.status} <> 'cancelled'`);
+
+  const occupiedApproved = await db()
+    .select({ keyword: keywordResults.keyword })
+    .from(keywordResults)
+    .where(eq(keywordResults.status, 'approved'));
+
+  const occupied = new Set<string>();
+  for (const r of occupiedArticles) {
+    const sig = signature(r.keyword);
+    if (sig) occupied.add(sig);
+  }
+  for (const r of occupiedApproved) {
+    const sig = signature(r.keyword);
+    if (sig) occupied.add(sig);
+  }
+
+  const seenInBatch = new Set<string>();
+  for (const c of candidates) {
+    const sig = signature(c.keyword);
+    if (!sig) continue;
+    if (occupied.has(sig) || seenInBatch.has(sig)) {
+      await db()
+        .update(keywordResults)
+        .set({
+          status: 'duplicate_signature',
+          processedAt: new Date(),
+          filterReason: 'token-set duplicate of an existing topic',
+        })
+        .where(eq(keywordResults.id, c.id));
+    } else {
+      seenInBatch.add(sig);
+    }
+  }
 }
 
 async function applyPass3Filters(ids: string[]) {

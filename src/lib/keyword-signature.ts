@@ -30,7 +30,8 @@ const PHRASE_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\bcrypto\s*currenc(?:y|ies)\b/gi, 'crypto'],
   [/\bdouble\s+top\b/gi, 'doubletop'],
   [/\bdouble\s+bottom\b/gi, 'doublebottom'],
-  [/\bhead\s+and\s+shoulders\b/gi, 'headshoulders'],
+  // Note: trailing 's' would be stripped by lemma(), so use the singular form.
+  [/\bhead\s+and\s+shoulders\b/gi, 'headshoulder'],
 ];
 
 // Single-token aliases applied after tokenisation. Maps surface form → canonical.

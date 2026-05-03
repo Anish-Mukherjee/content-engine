@@ -17,9 +17,10 @@
 //
 import 'dotenv/config';
 
-import { eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, sql } from 'drizzle-orm';
 import { pathToFileURL } from 'node:url';
 
+import { CLUSTER_COOLDOWN_DAYS, clusterTags, intersects } from '../src/config/topic-clusters';
 import { db, closeDb } from '../src/db/client';
 import { articles } from '../src/db/schema';
 import { signature } from '../src/lib/keyword-signature';
@@ -86,7 +87,11 @@ function pickRepresentative(rows: Article[]): Article {
   })[0];
 }
 
-export function buildDedupePlan(candidates: Article[], occupied: Article[]): DedupePlan {
+export function buildDedupePlan(
+  candidates: Article[],
+  occupied: Article[],
+  cooldownClusters?: Map<string, string>,
+): DedupePlan {
   // Map signatures held by occupied (published) rows → representative keyword.
   const occupiedSig = new Map<string, string>();
   for (const a of occupied) {
@@ -113,7 +118,6 @@ export function buildDedupePlan(candidates: Article[], occupied: Article[]): Ded
   for (const [sig, rows] of groups) {
     const occupiedKw = occupiedSig.get(sig);
     if (occupiedKw) {
-      // Whole cluster collides with an existing published article.
       for (const r of rows) {
         plan.cancel.push({
           id: r.id, keyword: r.keyword, category: r.category, status: r.status, signature: sig,
@@ -147,6 +151,31 @@ export function buildDedupePlan(candidates: Article[], occupied: Article[]): Ded
     });
   }
 
+  // Apply topic-cluster cooldown on top of signature dedup. Anything that
+  // survived signature dedup but lives in a cluster published within the last
+  // CLUSTER_COOLDOWN_DAYS gets demoted from keep → cancel.
+  if (cooldownClusters && cooldownClusters.size > 0) {
+    const survived: DedupePlan['keep'] = [];
+    for (const k of plan.keep) {
+      const tags = clusterTags(k.keyword);
+      let cooldownHit: string | null = null;
+      for (const t of tags) {
+        if (cooldownClusters.has(t)) { cooldownHit = t; break; }
+      }
+      if (cooldownHit) {
+        plan.cancel.push({
+          id: k.id, keyword: k.keyword, category: k.category, status: k.status, signature: k.signature,
+          searchVolume: k.searchVolume,
+          reason: `cluster_cooldown: ${cooldownHit}`,
+          keptKeyword: cooldownClusters.get(cooldownHit) ?? '',
+        });
+      } else {
+        survived.push(k);
+      }
+    }
+    plan.keep = survived;
+  }
+
   return plan;
 }
 
@@ -165,7 +194,21 @@ export async function dedupeActive(opts: { apply: boolean; scope?: DedupeScope }
   );
   const occupied = await db().select().from(articles).where(eq(articles.status, 'published'));
 
-  const plan = buildDedupePlan(candidates, occupied);
+  // Build map: cluster name → most recent keyword that put it in cooldown.
+  const cutoff = new Date(Date.now() - CLUSTER_COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
+  const recent = await db()
+    .select({ keyword: articles.keyword, publishedAt: articles.publishedAt })
+    .from(articles)
+    .where(and(eq(articles.status, 'published'), gte(articles.publishedAt, cutoff)))
+    .orderBy(sql`${articles.publishedAt} DESC`);
+  const cooldownClusters = new Map<string, string>();
+  for (const r of recent) {
+    for (const t of clusterTags(r.keyword)) {
+      if (!cooldownClusters.has(t)) cooldownClusters.set(t, r.keyword); // most-recent wins via DESC order
+    }
+  }
+
+  const plan = buildDedupePlan(candidates, occupied, cooldownClusters);
   if (!opts.apply) return plan;
 
   for (const c of plan.cancel) {

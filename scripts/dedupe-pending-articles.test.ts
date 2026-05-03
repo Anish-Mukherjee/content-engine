@@ -178,6 +178,36 @@ describe('dedupeActive (integration)', () => {
     expect(stillPending.map((a) => a.keyword).sort()).toEqual(['macd crypto strategy', 'trading bot crypto']);
   });
 
+  it('cancels active articles in topic clusters that have been published within cooldown', async () => {
+    // Recent bot publish puts the bot cluster in cooldown.
+    await insertArticle({ keyword: 'ai bots for trading', status: 'published', slug: 'ai-bots-for-trading', publishedAt: new Date() });
+    // Distinct-signature bot articles — different sigs, same cluster. All must be cancelled.
+    const botPending = await insertArticle({ keyword: 'best crypto trading bot for beginners', status: 'pending' });
+    const botSched = await insertArticle({ keyword: 'crypto algo trading', status: 'scheduled' });
+    // Non-bot article — must survive.
+    const safe = await insertArticle({ keyword: 'crypto market structure', status: 'pending' });
+
+    const plan = await dedupeActive({ apply: true });
+
+    const cancelled = await db().select().from(articles).where(eq(articles.status, 'cancelled'));
+    const cancelledIds = new Set(cancelled.map((c) => c.id));
+    expect(cancelledIds.has(botPending.id)).toBe(true);
+    expect(cancelledIds.has(botSched.id)).toBe(true);
+    expect(cancelledIds.has(safe.id)).toBe(false);
+
+    const reasons = new Set(cancelled.map((c) => c.lastError));
+    expect([...reasons].some((r) => r?.includes('cluster_cooldown: bot'))).toBe(true);
+    expect([...reasons].some((r) => r?.includes('ai bots for trading'))).toBe(true);
+  });
+
+  it('cluster cooldown does not fire for keywords with no cluster anchors', async () => {
+    await insertArticle({ keyword: 'ai bots for trading', status: 'published', slug: 'ai-bots-for-trading', publishedAt: new Date() });
+    const generic = await insertArticle({ keyword: 'crypto market analysis', status: 'pending' });
+    await dedupeActive({ apply: true });
+    const after = await db().select().from(articles).where(eq(articles.id, generic.id));
+    expect(after[0].status).toBe('pending');
+  });
+
   it('within active cluster, scheduled wins over pending sibling', async () => {
     const sched = await insertArticle({ keyword: 'crypto trading bot', status: 'scheduled' });
     const pend = await insertArticle({ keyword: 'trading bot crypto', status: 'pending' });

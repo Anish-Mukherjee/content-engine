@@ -7,15 +7,30 @@ vi.mock('../freepik', () => ({
 vi.mock('../wikimedia', () => ({
   findInlineImage: vi.fn(), findInlineCandidates: vi.fn(),
 }));
+vi.mock('../pixabay', () => ({
+  findInlineImage: vi.fn(), findInlineCandidates: vi.fn(),
+}));
+vi.mock('../pexels', () => ({
+  findInlineImage: vi.fn(), findInlineCandidates: vi.fn(),
+}));
+vi.mock('../unsplash/inline', () => ({
+  findInlineImage: vi.fn(), findInlineCandidates: vi.fn(),
+}));
 vi.mock('./download', () => ({ downloadAndSave: vi.fn() }));
 
 import { findInlineImage as findFreepik } from '../freepik';
 import { findInlineImage as findWikimedia } from '../wikimedia';
+import { findInlineImage as findPixabay } from '../pixabay';
+import { findInlineImage as findPexels } from '../pexels';
+import { findInlineImage as findUnsplashInline } from '../unsplash/inline';
 import { downloadAndSave } from './download';
 import { fetchInlineSource, resolvePlaceholder } from './index';
 import { fetchInlineCandidates } from './index';
 import { findInlineCandidates as findFreepikCandidates } from '../freepik';
 import { findInlineCandidates as findWikimediaCandidates } from '../wikimedia';
+import { findInlineCandidates as findPixabayCandidates } from '../pixabay';
+import { findInlineCandidates as findPexelsCandidates } from '../pexels';
+import { findInlineCandidates as findUnsplashInlineCandidates } from '../unsplash/inline';
 
 describe('inline-images orchestrator', () => {
   beforeEach(() => {
@@ -160,30 +175,44 @@ describe('inline-images orchestrator', () => {
 
 describe('fetchInlineCandidates', () => {
   beforeEach(() => {
-    (findFreepikCandidates as unknown as vi.Mock).mockReset();
-    (findWikimediaCandidates as unknown as vi.Mock).mockReset();
+    // Reset and default each source to [] so a test that doesn't set
+    // a specific source's behavior doesn't crash when the orchestrator
+    // calls it.
+    for (const mock of [
+      findFreepikCandidates, findWikimediaCandidates,
+      findPixabayCandidates, findPexelsCandidates, findUnsplashInlineCandidates,
+    ]) {
+      (mock as unknown as vi.Mock).mockReset();
+      (mock as unknown as vi.Mock).mockResolvedValue([]);
+    }
   });
 
-  it('concatenates freepik then wikimedia for the full query', async () => {
+  it('concatenates freepik, wikimedia, pixabay, pexels, unsplash for the full query in that order', async () => {
     (findFreepikCandidates as unknown as vi.Mock).mockResolvedValueOnce([
       { sourceId: 'F1', inlineSource: { url: 'fp/1' } as any },
     ]);
     (findWikimediaCandidates as unknown as vi.Mock).mockResolvedValueOnce([
       { sourceId: 'https://commons/W1', inlineSource: { url: 'wm/1' } as any },
     ]);
+    (findPixabayCandidates as unknown as vi.Mock).mockResolvedValueOnce([
+      { sourceId: 'PX1', inlineSource: { url: 'px/1' } as any },
+    ]);
+    (findPexelsCandidates as unknown as vi.Mock).mockResolvedValueOnce([
+      { sourceId: 'PE1', inlineSource: { url: 'pe/1' } as any },
+    ]);
+    (findUnsplashInlineCandidates as unknown as vi.Mock).mockResolvedValueOnce([
+      { sourceId: 'U1', inlineSource: { url: 'un/1' } as any },
+    ]);
 
     const out = await fetchInlineCandidates('short query');
-    expect(out.map((c) => c.source)).toEqual(['freepik', 'wikimedia']);
-    expect(out.map((c) => c.sourceId)).toEqual(['F1', 'https://commons/W1']);
+    expect(out.map((c) => c.source)).toEqual(['freepik', 'wikimedia', 'pixabay', 'pexels', 'unsplash']);
+    expect(out.map((c) => c.sourceId)).toEqual(['F1', 'https://commons/W1', 'PX1', 'PE1', 'U1']);
   });
 
   it('also tries 3-word fallback query when full query is long', async () => {
     (findFreepikCandidates as unknown as vi.Mock)
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ sourceId: 'F2', inlineSource: { url: 'fp/2' } as any }]);
-    (findWikimediaCandidates as unknown as vi.Mock)
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([]);
 
     const out = await fetchInlineCandidates('Bybit futures perpetual contract trading interface');
     expect(out).toHaveLength(1);
@@ -191,6 +220,10 @@ describe('fetchInlineCandidates', () => {
       .toBe('Bybit futures perpetual contract trading interface');
     expect((findFreepikCandidates as unknown as vi.Mock).mock.calls[1][0])
       .toBe('Bybit futures perpetual');
+    // Each source is called twice (once per variant)
+    expect((findPixabayCandidates as unknown as vi.Mock)).toHaveBeenCalledTimes(2);
+    expect((findPexelsCandidates as unknown as vi.Mock)).toHaveBeenCalledTimes(2);
+    expect((findUnsplashInlineCandidates as unknown as vi.Mock)).toHaveBeenCalledTimes(2);
   });
 
   it('treats a thrown source as empty (per-source isolation)', async () => {
@@ -201,5 +234,17 @@ describe('fetchInlineCandidates', () => {
     const out = await fetchInlineCandidates('q');
     expect(out).toHaveLength(1);
     expect(out[0].source).toBe('wikimedia');
+  });
+
+  it('one dead source does not block the others (e.g. freepik 429 → pixabay still contributes)', async () => {
+    (findFreepikCandidates as unknown as vi.Mock).mockRejectedValueOnce(new Error('freepik 429'));
+    (findPixabayCandidates as unknown as vi.Mock).mockResolvedValueOnce([
+      { sourceId: 'PX', inlineSource: { url: 'px' } as any },
+    ]);
+    (findPexelsCandidates as unknown as vi.Mock).mockResolvedValueOnce([
+      { sourceId: 'PE', inlineSource: { url: 'pe' } as any },
+    ]);
+    const out = await fetchInlineCandidates('q');
+    expect(out.map((c) => c.source)).toEqual(['pixabay', 'pexels']);
   });
 });

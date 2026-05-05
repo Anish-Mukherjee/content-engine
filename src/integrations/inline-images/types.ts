@@ -17,7 +17,7 @@ export type InlineImageSource = {
 };
 
 export type InlineImageCandidate = {
-  source: 'freepik' | 'wikimedia';
+  source: 'freepik' | 'wikimedia' | 'pixabay' | 'pexels' | 'unsplash';
   sourceId: string;
   inlineSource: InlineImageSource;
 };

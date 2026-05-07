@@ -49,7 +49,11 @@ export async function generateOutline(
 ): Promise<ArticleOutline> {
   const resp = await anthropic().messages.create({
     model: MODELS.outline,
-    max_tokens: 3000,
+    // Briefs with 5 questions + 5 H2s + 5 FAQs routinely produce 4-5k output
+    // tokens. Earlier 3000 cap silently truncated mid-JSON ("double bottom
+    // crypto trading", May 2026), surfacing as JSON parse failure. 6000 gives
+    // a safe margin with detection below if it ever truncates again.
+    max_tokens: 6000,
     system: claudeOutlineSystem(brand),
     messages: [{
       role: 'user',
@@ -60,6 +64,9 @@ export async function generateOutline(
       }),
     }],
   });
+  if (resp.stop_reason === 'max_tokens') {
+    throw new TerminalError('claude outline: response truncated by max_tokens — bump the limit');
+  }
   const text = extractText(resp);
   const parsed = tryJson(text);
   if (!parsed || typeof parsed !== 'object' || !('title' in parsed) || !('slug' in parsed) || !('outline' in parsed)) {

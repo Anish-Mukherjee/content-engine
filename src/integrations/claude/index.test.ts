@@ -99,6 +99,19 @@ describe('claude integration', () => {
     ).rejects.toThrow(/json/i);
   });
 
+  it('generateOutline throws a clear error when Claude truncates by max_tokens', async () => {
+    // Mirrors the May 2026 incident: a verbose brief produced ~3000 output
+    // tokens and the JSON was cut off mid-string. The misleading symptom was
+    // "JSON parse failed"; the new guard surfaces the real cause.
+    createMock.mockResolvedValueOnce({
+      content: [{ type: 'text', text: '{ "title": "T", "slug": "t", "outline": ' }],
+      stop_reason: 'max_tokens',
+    });
+    await expect(
+      generateOutline({ id: '1', keyword: 'k', searchVolume: 100 }, stubBrief(), BRAND),
+    ).rejects.toThrow(/max_tokens/);
+  });
+
   it('isTransientClaudeError detects APIConnectionError by name', () => {
     const err = new Error('connection lost');
     err.name = 'APIConnectionError';

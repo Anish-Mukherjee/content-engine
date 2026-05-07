@@ -26,7 +26,7 @@ async function main() {
 
   const resp = await anthropic().messages.create({
     model: MODELS.outline,
-    max_tokens: 3000,
+    max_tokens: 6000,
     system: claudeOutlineSystem(BRAND),
     messages: [{
       role: 'user',

@@ -360,18 +360,19 @@ export function claudeArticleUser(params: {
 }): string {
   const { keyword, outline, brief, secondaryKeywords, ctaPlacement, ctaHtml, wordCount, searchIntent, audience } = params;
 
-  const competitorWeaknesses = brief.top_3_competitors
-    .map((c, i) => `Competitor ${i + 1}: ${c.title}\n  Weaknesses: ${c.weaknesses.join(', ')}`)
+  const competitorWeaknesses = (brief.top_3_competitors ?? [])
+    .map((c, i) => `Competitor ${i + 1}: ${c.title}\n  Weaknesses: ${(c.weaknesses ?? []).join(', ')}`)
     .join('\n');
 
-  const contentGaps = brief.content_gaps.map((g, i) => `${i + 1}. ${g}`).join('\n');
-  const questions = brief.questions_to_answer.map((q, i) => `${i + 1}. ${q}`).join('\n');
-  const keyStats = brief.key_stats_to_include.map((s, i) => `${i + 1}. ${s}`).join('\n');
-  const faqs = brief.faq_questions.map((q, i) => `${i + 1}. ${q}`).join('\n');
+  const contentGaps = (brief.content_gaps ?? []).map((g, i) => `${i + 1}. ${g}`).join('\n');
+  const questions = (brief.questions_to_answer ?? []).map((q, i) => `${i + 1}. ${q}`).join('\n');
+  const keyStats = (brief.key_stats_to_include ?? []).map((s, i) => `${i + 1}. ${s}`).join('\n');
+  const faqs = (brief.faq_questions ?? []).map((q, i) => `${i + 1}. ${q}`).join('\n');
 
-  const sections = outline.outline.sections
+  const sections = (outline.outline.sections ?? [])
     .map((s) => {
-      const h3Line = s.h3s.length > 0 ? `  H3s: ${s.h3s.join(', ')}\n` : '';
+      const h3s = s.h3s ?? [];
+      const h3Line = h3s.length > 0 ? `  H3s: ${h3s.join(', ')}\n` : '';
       return `H2: ${s.h2}\n  What to cover: ${s.summary}\n${h3Line}  Target words: ${s.word_count}`;
     })
     .join('\n\n');
@@ -415,10 +416,10 @@ FAQ questions to answer:
 ${faqs}
 
 SECONDARY KEYWORDS TO INCLUDE NATURALLY (do not force or repeat):
-${secondaryKeywords.join(', ')}
+${(secondaryKeywords ?? []).join(', ')}
 
 KEY TERMS TO USE THROUGHOUT:
-${brief.key_terms_to_include.join(', ')}
+${(brief.key_terms_to_include ?? []).join(', ')}
 
 RECOMMENDED TONE:
 ${brief.recommended_tone}

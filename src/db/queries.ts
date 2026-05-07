@@ -18,8 +18,10 @@ export async function getCooldownClusters(daysAgo: number = CLUSTER_COOLDOWN_DAY
   return result;
 }
 
-export async function pickNextDrivable() {
-  const [retryable] = await db()
+export async function pickNextDrivable(excludeIds: string[] = []) {
+  const excludeSet = new Set(excludeIds);
+
+  const retryables = await db()
     .select()
     .from(articles)
     .where(
@@ -28,9 +30,10 @@ export async function pickNextDrivable() {
         lt(articles.retryCount, 3),
       ),
     )
-    .orderBy(asc(articles.updatedAt))
-    .limit(1);
-  if (retryable) return retryable;
+    .orderBy(asc(articles.updatedAt));
+  for (const r of retryables) {
+    if (!excludeSet.has(r.id)) return r;
+  }
 
   // Round-robin across categories. Pick the category whose most recent activity
   // (= max of `published_at` for published rows OR `updated_at` for any in-flight
@@ -66,6 +69,7 @@ export async function pickNextDrivable() {
   `);
 
   for (const c of candidates) {
+    if (excludeSet.has(c.id)) continue;
     if (intersects(clusterTags(c.keyword), cooldown)) continue;
     return c;
   }

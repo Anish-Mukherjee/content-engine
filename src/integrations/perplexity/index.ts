@@ -25,7 +25,7 @@ export async function researchKeyword(keyword: string, brand: BrandConfig): Prom
     user: perplexityResearchUser(keyword),
   });
   const parsed = tryParseBrief(first);
-  if (parsed) return validateBrief(parsed);
+  if (parsed) return validateBrief(normalizeBrief(parsed));
 
   const second = await chatCompletion({
     system: perplexityResearchSystem(brand),
@@ -34,7 +34,7 @@ export async function researchKeyword(keyword: string, brand: BrandConfig): Prom
       '\n\nReturn ONLY raw JSON. No prose, no markdown, no backticks. The response must start with { and end with }.',
   });
   const reparsed = tryParseBrief(second);
-  if (reparsed) return validateBrief(reparsed);
+  if (reparsed) return validateBrief(normalizeBrief(reparsed));
 
   throw new TerminalError('perplexity returned non-JSON twice');
 }
@@ -50,6 +50,42 @@ function tryParseBrief(raw: string): PerplexityBrief | null {
   } catch {
     return null;
   }
+}
+
+// Coerce missing/malformed array+string fields to safe defaults. Perplexity
+// occasionally omits per-competitor fields (e.g. `weaknesses`) — without this
+// the prompt builders blow up on `.join`/`.map` of undefined and the article
+// dies at the write stage with no recovery.
+function normalizeBrief(brief: PerplexityBrief): PerplexityBrief {
+  const arr = (v: unknown): string[] =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+  const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+  const num = (v: unknown, fallback: number): number => (typeof v === 'number' ? v : fallback);
+
+  const competitors = Array.isArray(brief.top_3_competitors)
+    ? brief.top_3_competitors.map((c) => {
+        const raw = (c ?? {}) as Record<string, unknown>;
+        return {
+          title: str(raw.title),
+          url: str(raw.url),
+          strengths: arr(raw.strengths),
+          weaknesses: arr(raw.weaknesses),
+          word_count: num(raw.word_count, 0),
+          tone: str(raw.tone),
+        };
+      })
+    : [];
+
+  return {
+    ...brief,
+    top_3_competitors: competitors,
+    content_gaps: arr(brief.content_gaps),
+    questions_to_answer: arr(brief.questions_to_answer),
+    key_stats_to_include: arr((brief as Record<string, unknown>).key_stats_to_include),
+    recommended_h2s: arr(brief.recommended_h2s),
+    key_terms_to_include: arr((brief as Record<string, unknown>).key_terms_to_include),
+    faq_questions: arr(brief.faq_questions),
+  };
 }
 
 function validateBrief(brief: PerplexityBrief): PerplexityBrief {

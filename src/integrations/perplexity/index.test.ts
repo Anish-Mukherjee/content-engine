@@ -85,4 +85,25 @@ describe('perplexity integration', () => {
     fetchMock.mockResolvedValueOnce(briefResponse(JSON.stringify(partial)));
     await expect(researchKeyword('x', BRAND)).rejects.toThrow(/winning_angle/);
   });
+
+  it('coerces a competitor missing its weaknesses field to an empty array', async () => {
+    // Mirrors the May 2026 prod incident: Perplexity returned a brief where the
+    // 3rd competitor (phemex.com) had no `weaknesses` field, which crashed the
+    // write stage at `c.weaknesses.join(', ')`.
+    const brief = validBrief();
+    const competitors = brief.top_3_competitors.map((c, i) => {
+      if (i === 2) {
+        const { weaknesses, ...rest } = c;
+        void weaknesses;
+        return rest;
+      }
+      return c;
+    });
+    const malformed = { ...brief, top_3_competitors: competitors };
+    fetchMock.mockResolvedValueOnce(briefResponse(JSON.stringify(malformed)));
+
+    const result = await researchKeyword('x', BRAND);
+    expect(result.top_3_competitors[2].weaknesses).toEqual([]);
+    expect(result.top_3_competitors[0].weaknesses).toEqual(['w']);
+  });
 });

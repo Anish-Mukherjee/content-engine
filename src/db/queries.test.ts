@@ -188,6 +188,26 @@ describe('queries', () => {
     expect(pick2?.id).toBe(eduA.id);
   });
 
+  it('pickNextDrivable skips ids in the excludeIds list and falls through to next candidate', async () => {
+    // Mirrors the May 2026 incident: a poisoned retryable was monopolising
+    // the daily batch. Both ticks now pass the previous tick's id so a second
+    // candidate gets a chance.
+    const [poisoned] = await db().insert(articles).values({
+      keyword: 'poisoned', category: 'exchanges', status: 'write_failed', retryCount: 1,
+    }).returning();
+    const [pending] = await db().insert(articles).values({
+      keyword: 'fresh', category: 'analysis', status: 'pending',
+    }).returning();
+
+    // No exclusion → poisoned wins (retryable beats pending)
+    const first = await pickNextDrivable();
+    expect(first?.id).toBe(poisoned.id);
+
+    // With poisoned excluded → fall through to the pending candidate
+    const second = await pickNextDrivable([poisoned.id]);
+    expect(second?.id).toBe(pending.id);
+  });
+
   it('markFailed sets status, increments retryCount, records lastError', async () => {
     const [a] = await db().insert(articles).values({
       keyword: 'x', category: 'exchanges', status: 'writing',

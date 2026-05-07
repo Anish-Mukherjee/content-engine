@@ -13,8 +13,14 @@ type Handler = () => Promise<void>;
 
 async function driveDailyBatch(): Promise<void> {
   const n = env().ARTICLES_PER_DAY;
+  // Track ids already attempted in this batch so a single poisoned article
+  // can't monopolise both ticks (May 2026 incident: one bad brief blocked the
+  // entire day's batch by re-being picked as the oldest retryable).
+  const attempted: string[] = [];
   for (let i = 0; i < n; i++) {
-    await driveArticle();
+    const id = await driveArticle(attempted);
+    if (!id) break;
+    attempted.push(id);
   }
 }
 

@@ -25,11 +25,11 @@ const STEPS: readonly Step[] = [
   { name: 'queue',    fn: queueArticle,   allowedStatuses: ['image_ready', 'queue_failed'] },
 ];
 
-export async function driveArticle(): Promise<void> {
-  const article = await pickNextDrivable();
+export async function driveArticle(excludeIds: string[] = []): Promise<string | undefined> {
+  const article = await pickNextDrivable(excludeIds);
   if (!article) {
     logger.info('no drivable article');
-    return;
+    return undefined;
   }
 
   logger.info({ articleId: article.id, keyword: article.keyword }, 'driving article');
@@ -55,9 +55,10 @@ export async function driveArticle(): Promise<void> {
         retryCount: retryAfter,
         willRetry: retryAfter < 3,
       });
-      return;
+      return article.id;
     }
   }
 
   logger.info({ articleId: article.id }, 'article driven to scheduled');
+  return article.id;
 }

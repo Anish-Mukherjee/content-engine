@@ -164,3 +164,41 @@ export const verification = pgTable('verification', {
 }, (t) => ({
   idxIdentifier: index('idx_verification_identifier').on(t.identifier),
 }));
+
+// ─────────────────────────────────────────────────────────────────
+// Better Auth — organizations plugin
+// ─────────────────────────────────────────────────────────────────
+
+export const organization = pgTable('organization', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  slug: text('slug').notNull().unique(),
+  logo: text('logo'),
+  metadata: jsonb('metadata'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const member = pgTable('member', {
+  id: text('id').primaryKey(),
+  organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  role: text('role').notNull().default('member'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (t) => ({
+  uniqOrgUser: uniqueIndex('uniq_member_org_user').on(t.organizationId, t.userId),
+  idxOrg: index('idx_member_org').on(t.organizationId),
+  idxUser: index('idx_member_user').on(t.userId),
+}));
+
+export const invitation = pgTable('invitation', {
+  id: text('id').primaryKey(),
+  organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  email: text('email').notNull(),
+  role: text('role'),
+  status: text('status').notNull(), // 'pending' | 'accepted' | 'expired' | 'cancelled'
+  expiresAt: timestamp('expires_at').notNull(),
+  inviterId: text('inviter_id').notNull().references(() => user.id),
+}, (t) => ({
+  idxOrgEmail: index('idx_invitation_org_email').on(t.organizationId, t.email),
+  idxStatus: index('idx_invitation_status').on(t.status),
+}));

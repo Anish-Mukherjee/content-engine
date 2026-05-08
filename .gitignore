@@ -8,3 +8,6 @@ google-service-account.json
 storage/images/*.jpg
 !storage/images/fallbacks/*.jpg
 .DS_Store
+
+# Prod DB snapshots — never commit
+prod-snapshot-*.sql

@@ -202,3 +202,37 @@ export const invitation = pgTable('invitation', {
   idxOrgEmail: index('idx_invitation_org_email').on(t.organizationId, t.email),
   idxStatus: index('idx_invitation_status').on(t.status),
 }));
+
+// ─────────────────────────────────────────────────────────────────
+// Suprero-specific tables
+// ─────────────────────────────────────────────────────────────────
+
+export const site = pgTable('site', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  slug: text('slug').notNull(),
+  categories: jsonb('categories').notNull().default([]),
+  defaultCategory: text('default_category'),
+  publishingMode: text('publishing_mode').notNull().default('draft_only'),
+  scheduleEnabled: boolean('schedule_enabled').notNull().default(true),
+  targetWordCount: integer('target_word_count').notNull().default(1500),
+  toneOfVoice: text('tone_of_voice'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow().$onUpdate(() => new Date()),
+}, (t) => ({
+  uniqOrgSlug: uniqueIndex('uniq_site_org_slug').on(t.organizationId, t.slug),
+  idxOrg: index('idx_site_org').on(t.organizationId),
+}));
+
+export const apiCallLog = pgTable('api_call_log', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  siteId: uuid('site_id').notNull().references(() => site.id, { onDelete: 'cascade' }),
+  provider: text('provider').notNull(), // 'dataforseo' | 'anthropic' | 'perplexity' | 'unsplash' | 'freepik' | 'pexels' | 'pixabay'
+  costEstimateUsd: real('cost_estimate_usd'),
+  metadata: jsonb('metadata'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (t) => ({
+  idxProviderTime: index('idx_acl_provider_time').on(t.provider, t.createdAt),
+  idxSiteTime: index('idx_acl_site_time').on(t.siteId, t.createdAt),
+}));

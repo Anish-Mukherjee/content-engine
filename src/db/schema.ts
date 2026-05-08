@@ -5,6 +5,7 @@ import {
 
 export const seedKeywords = pgTable('seed_keywords', {
   id: uuid('id').primaryKey().defaultRandom(),
+  siteId: uuid('site_id'), // NULL until Plan 4 backfill; no FK yet
   keyword: text('keyword').notNull(),
   category: text('category').notNull(),
   lastUsedAt: timestamp('last_used_at'),
@@ -17,6 +18,7 @@ export const seedKeywords = pgTable('seed_keywords', {
 
 export const dataforseoTasks = pgTable('dataforseo_tasks', {
   id: uuid('id').primaryKey().defaultRandom(),
+  siteId: uuid('site_id'), // NULL until Plan 4 backfill; no FK yet
   externalTaskId: text('external_task_id').notNull().unique(),
   seedKeywordId: uuid('seed_keyword_id').notNull().references(() => seedKeywords.id),
   status: text('status').notNull(),
@@ -30,6 +32,7 @@ export const dataforseoTasks = pgTable('dataforseo_tasks', {
 
 export const keywordResults = pgTable('keyword_results', {
   id: uuid('id').primaryKey().defaultRandom(),
+  siteId: uuid('site_id'), // NULL until Plan 4 backfill; no FK yet
   keyword: text('keyword').notNull(),
   category: text('category').notNull(),
   seedKeywordId: uuid('seed_keyword_id').notNull().references(() => seedKeywords.id),
@@ -50,6 +53,7 @@ export const keywordResults = pgTable('keyword_results', {
 
 export const articles = pgTable('articles', {
   id: uuid('id').primaryKey().defaultRandom(),
+  siteId: uuid('site_id'), // NULL until Plan 4 backfill; no FK yet
   keywordResultId: uuid('keyword_result_id').references(() => keywordResults.id),
   keyword: text('keyword').notNull(),
   category: text('category').notNull(),
@@ -93,6 +97,7 @@ export const articles = pgTable('articles', {
 
 export const imageUsage = pgTable('image_usage', {
   id: uuid('id').primaryKey().defaultRandom(),
+  siteId: uuid('site_id'), // NULL until Plan 4 backfill; no FK yet
   articleId: uuid('article_id').notNull().references(() => articles.id, { onDelete: 'cascade' }),
   role: text('role').notNull(),                  // 'hero' | 'inline'
   position: integer('position'),                  // null for hero, 1..N for inline

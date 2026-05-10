@@ -73,3 +73,42 @@ describe('schema 0003 — additive multi-tenant tables', () => {
     expect(rows.length).toBe(0);
   });
 });
+
+describe('schema 0004 — customer_invite table', () => {
+  afterAll(async () => {
+    await closeDb();
+  });
+
+  it('creates the customer_invite table', async () => {
+    const tables = await db().execute<{ table_name: string }>(sql`
+      select table_name from information_schema.tables
+      where table_schema = 'public'
+      and table_name = 'customer_invite'
+    `);
+    expect(tables.length).toBe(1);
+  });
+
+  it('customer_invite.token is uniquely indexed', async () => {
+    const rows = await db().execute<{ indexname: string }>(sql`
+      select indexname from pg_indexes
+      where schemaname = 'public'
+        and tablename = 'customer_invite'
+        and indexname = 'uniq_ci_token'
+    `);
+    expect(rows.length).toBe(1);
+  });
+
+  it('customer_invite has FKs to user and organization', async () => {
+    const fks = await db().execute<{ constraint_name: string; column_name: string }>(sql`
+      select tc.constraint_name, kcu.column_name
+      from information_schema.table_constraints tc
+      join information_schema.key_column_usage kcu
+        on tc.constraint_name = kcu.constraint_name
+      where tc.table_name = 'customer_invite'
+        and tc.constraint_type = 'FOREIGN KEY'
+      order by kcu.column_name
+    `);
+    const cols = fks.map((f) => f.column_name).sort();
+    expect(cols).toEqual(['accepted_org_id', 'accepted_user_id', 'inviter_user_id']);
+  });
+});

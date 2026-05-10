@@ -241,3 +241,25 @@ export const apiCallLog = pgTable('api_call_log', {
   idxProviderTime: index('idx_acl_provider_time').on(t.provider, t.createdAt),
   idxSiteTime: index('idx_acl_site_time').on(t.siteId, t.createdAt),
 }));
+
+// ─────────────────────────────────────────────────────────────────
+// customer_invite — staff-issued invites that pre-date org existence
+// (separate from better-auth invitation, which requires an org)
+// ─────────────────────────────────────────────────────────────────
+
+export const customerInvite = pgTable('customer_invite', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  email: text('email').notNull(),
+  token: text('token').notNull().unique(), // url-safe random; verified by /accept-invite
+  intendedOrgName: text('intended_org_name').notNull(), // pre-filled on accept; user can edit
+  inviterUserId: text('inviter_user_id').references(() => user.id, { onDelete: 'set null' }),
+  status: text('status').notNull().default('pending'), // 'pending' | 'accepted' | 'expired' | 'revoked'
+  expiresAt: timestamp('expires_at').notNull(),
+  acceptedAt: timestamp('accepted_at'),
+  acceptedUserId: text('accepted_user_id').references(() => user.id, { onDelete: 'set null' }),
+  acceptedOrgId: text('accepted_org_id').references(() => organization.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (t) => ({
+  idxStatusEmail: index('idx_ci_status_email').on(t.status, t.email),
+  idxToken: uniqueIndex('uniq_ci_token').on(t.token),
+}));

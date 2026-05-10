@@ -3,7 +3,30 @@ import { and, asc, eq, gte, lt, sql } from 'drizzle-orm';
 
 import { CLUSTER_COOLDOWN_DAYS, clusterTags, intersects } from '../config/topic-clusters';
 import { db } from './client';
-import { articles, imageUsage } from './schema';
+import { articles, imageUsage, site } from './schema';
+
+// TODO(multi-tenant): replace with parent-propagation once Plan 7 adds multi-site callers.
+// For v0 we have one tenant (XG); every new pipeline row gets the XG site_id.
+let _defaultSiteId: string | null = null;
+
+export async function getDefaultSiteId(): Promise<string> {
+  if (_defaultSiteId) return _defaultSiteId;
+  const [row] = await db()
+    .select({ id: site.id })
+    .from(site)
+    .where(eq(site.slug, 'xerogravity'))
+    .limit(1);
+  if (!row) {
+    throw new Error('No site with slug=xerogravity. Run scripts/seed-xg-and-backfill.sql first.');
+  }
+  _defaultSiteId = row.id;
+  return _defaultSiteId;
+}
+
+// Test-only: reset cache between tests so seedXgSite() inserts are picked up.
+export function _resetDefaultSiteIdCache(): void {
+  _defaultSiteId = null;
+}
 
 export async function getCooldownClusters(daysAgo: number = CLUSTER_COOLDOWN_DAYS): Promise<Set<string>> {
   const cutoff = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);

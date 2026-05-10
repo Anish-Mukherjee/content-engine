@@ -77,10 +77,11 @@ export type PickInlineArgs = {
   articleId: string;
   position: number;
   filenameStem: string;
+  category?: Category;
 };
 
 export async function pickUniqueInline(args: PickInlineArgs): Promise<InlineImageResult | null> {
-  const candidates = await fetchInlineCandidates(args.query);
+  const candidates = await fetchInlineCandidates(args.query, args.category);
   for (const cand of candidates) {
     if (await isSourceIdUsed(cand.source, cand.sourceId)) continue;
 

@@ -1,4 +1,10 @@
 // src/integrations/inline-images/index.ts
+import {
+  type Category,
+  type InlineSource,
+  CATEGORY_INLINE_SOURCES,
+  DEFAULT_INLINE_SOURCES,
+} from '../../config/categories';
 import { logger } from '../../lib/logger';
 import { findInlineImage as findFreepik } from '../freepik';
 import { findInlineImage as findWikimedia } from '../wikimedia';
@@ -7,6 +13,7 @@ import { findInlineCandidates as findWikimediaCandidates } from '../wikimedia';
 import { findInlineCandidates as findPixabayCandidates } from '../pixabay';
 import { findInlineCandidates as findPexelsCandidates } from '../pexels';
 import { findInlineCandidates as findUnsplashInlineCandidates } from '../unsplash/inline';
+import { findInlineCandidates as findLocalPressKitCandidates } from '../local-press-kit';
 import { downloadAndSave } from './download';
 import type { InlineImageSource, InlineImageCandidate } from './types';
 
@@ -99,20 +106,36 @@ function buildQueryVariants(query: string): string[] {
   return [query, words.slice(0, 3).join(' ')];
 }
 
-export async function fetchInlineCandidates(query: string): Promise<InlineImageCandidate[]> {
+type CandidateFetcher = (q: string) => Promise<{ sourceId: string; inlineSource: InlineImageSource }[]>;
+
+const SOURCE_FETCHERS: Record<InlineSource, CandidateFetcher> = {
+  'local-press-kit': findLocalPressKitCandidates,
+  freepik:           findFreepikCandidates,
+  wikimedia:         findWikimediaCandidates,
+  pixabay:           findPixabayCandidates,
+  pexels:            findPexelsCandidates,
+  unsplash:          findUnsplashInlineCandidates,
+};
+
+export async function fetchInlineCandidates(
+  query: string,
+  category?: Category,
+): Promise<InlineImageCandidate[]> {
+  const order = category ? CATEGORY_INLINE_SOURCES[category] : DEFAULT_INLINE_SOURCES;
   const variants = buildQueryVariants(query);
   const out: InlineImageCandidate[] = [];
   for (const variant of variants) {
-    const fp = await tryGetMany(findFreepikCandidates, 'freepik', variant);
-    out.push(...fp.map((c) => ({ source: 'freepik' as const, sourceId: c.sourceId, inlineSource: c.inlineSource })));
-    const wm = await tryGetMany(findWikimediaCandidates, 'wikimedia', variant);
-    out.push(...wm.map((c) => ({ source: 'wikimedia' as const, sourceId: c.sourceId, inlineSource: c.inlineSource })));
-    const px = await tryGetMany(findPixabayCandidates, 'pixabay', variant);
-    out.push(...px.map((c) => ({ source: 'pixabay' as const, sourceId: c.sourceId, inlineSource: c.inlineSource })));
-    const pe = await tryGetMany(findPexelsCandidates, 'pexels', variant);
-    out.push(...pe.map((c) => ({ source: 'pexels' as const, sourceId: c.sourceId, inlineSource: c.inlineSource })));
-    const us = await tryGetMany(findUnsplashInlineCandidates, 'unsplash', variant);
-    out.push(...us.map((c) => ({ source: 'unsplash' as const, sourceId: c.sourceId, inlineSource: c.inlineSource })));
+    for (const sourceName of order) {
+      const fetcher = SOURCE_FETCHERS[sourceName];
+      const cands = await tryGetMany(fetcher, sourceName, variant);
+      out.push(
+        ...cands.map((c) => ({
+          source: sourceName,
+          sourceId: c.sourceId,
+          inlineSource: c.inlineSource,
+        })),
+      );
+    }
   }
   return out;
 }

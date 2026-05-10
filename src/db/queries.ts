@@ -99,7 +99,7 @@ export type RecordImageUsageInput = {
   role: 'hero' | 'inline';
   position: number | null;
   url: string;
-  source: 'unsplash' | 'freepik' | 'wikimedia' | 'pixabay' | 'pexels' | 'legacy';
+  source: 'unsplash' | 'freepik' | 'wikimedia' | 'pixabay' | 'pexels' | 'local-press-kit' | 'legacy';
   sourceId: string | null;
   contentHash: string;
 };

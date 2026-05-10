@@ -7,4 +7,11 @@ logs/
 google-service-account.json
 storage/images/*.jpg
 !storage/images/fallbacks/*.jpg
+# Press-kit assets are manually curated per-exchange — keep dir scaffolding
+# (READMEs) tracked but ignore the binary images so they don't bloat git.
+storage/exchange-assets/**/*.jpg
+storage/exchange-assets/**/*.jpeg
+storage/exchange-assets/**/*.png
+storage/exchange-assets/**/*.webp
+!storage/exchange-assets/**/README.md
 .DS_Store

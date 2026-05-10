@@ -16,6 +16,9 @@ vi.mock('../pexels', () => ({
 vi.mock('../unsplash/inline', () => ({
   findInlineImage: vi.fn(), findInlineCandidates: vi.fn(),
 }));
+vi.mock('../local-press-kit', () => ({
+  findInlineCandidates: vi.fn(),
+}));
 vi.mock('./download', () => ({ downloadAndSave: vi.fn() }));
 
 import { findInlineImage as findFreepik } from '../freepik';
@@ -31,6 +34,7 @@ import { findInlineCandidates as findWikimediaCandidates } from '../wikimedia';
 import { findInlineCandidates as findPixabayCandidates } from '../pixabay';
 import { findInlineCandidates as findPexelsCandidates } from '../pexels';
 import { findInlineCandidates as findUnsplashInlineCandidates } from '../unsplash/inline';
+import { findInlineCandidates as findLocalPressKitCandidates } from '../local-press-kit';
 
 describe('inline-images orchestrator', () => {
   beforeEach(() => {
@@ -181,6 +185,7 @@ describe('fetchInlineCandidates', () => {
     for (const mock of [
       findFreepikCandidates, findWikimediaCandidates,
       findPixabayCandidates, findPexelsCandidates, findUnsplashInlineCandidates,
+      findLocalPressKitCandidates,
     ]) {
       (mock as unknown as vi.Mock).mockReset();
       (mock as unknown as vi.Mock).mockResolvedValue([]);
@@ -246,5 +251,77 @@ describe('fetchInlineCandidates', () => {
     ]);
     const out = await fetchInlineCandidates('q');
     expect(out.map((c) => c.source)).toEqual(['pixabay', 'pexels']);
+  });
+
+  describe('category-aware source routing', () => {
+    it('exchanges category puts local-press-kit first then wikimedia, unsplash, pexels, pixabay, freepik', async () => {
+      (findLocalPressKitCandidates as unknown as vi.Mock).mockResolvedValueOnce([
+        { sourceId: 'bybit/1.jpg', inlineSource: { url: 'file:///x/1.jpg' } as any },
+      ]);
+      (findWikimediaCandidates as unknown as vi.Mock).mockResolvedValueOnce([
+        { sourceId: 'W', inlineSource: { url: 'wm' } as any },
+      ]);
+      (findUnsplashInlineCandidates as unknown as vi.Mock).mockResolvedValueOnce([
+        { sourceId: 'U', inlineSource: { url: 'un' } as any },
+      ]);
+      (findPexelsCandidates as unknown as vi.Mock).mockResolvedValueOnce([
+        { sourceId: 'PE', inlineSource: { url: 'pe' } as any },
+      ]);
+      (findPixabayCandidates as unknown as vi.Mock).mockResolvedValueOnce([
+        { sourceId: 'PX', inlineSource: { url: 'px' } as any },
+      ]);
+      (findFreepikCandidates as unknown as vi.Mock).mockResolvedValueOnce([
+        { sourceId: 'F', inlineSource: { url: 'fp' } as any },
+      ]);
+
+      const out = await fetchInlineCandidates('Bybit perpetual interface', 'exchanges');
+      expect(out.map((c) => c.source)).toEqual([
+        'local-press-kit', 'wikimedia', 'unsplash', 'pexels', 'pixabay', 'freepik',
+      ]);
+    });
+
+    it('strategies category puts unsplash first and never tries local-press-kit', async () => {
+      (findUnsplashInlineCandidates as unknown as vi.Mock).mockResolvedValueOnce([
+        { sourceId: 'U', inlineSource: { url: 'un' } as any },
+      ]);
+      (findPexelsCandidates as unknown as vi.Mock).mockResolvedValueOnce([
+        { sourceId: 'PE', inlineSource: { url: 'pe' } as any },
+      ]);
+      (findPixabayCandidates as unknown as vi.Mock).mockResolvedValueOnce([
+        { sourceId: 'PX', inlineSource: { url: 'px' } as any },
+      ]);
+
+      const out = await fetchInlineCandidates('crypto trading desk', 'strategies');
+      expect(out.map((c) => c.source).slice(0, 3)).toEqual(['unsplash', 'pexels', 'pixabay']);
+      expect(findLocalPressKitCandidates).not.toHaveBeenCalled();
+    });
+
+    it('patterns category puts wikimedia first (technical-diagram bias)', async () => {
+      (findWikimediaCandidates as unknown as vi.Mock).mockResolvedValueOnce([
+        { sourceId: 'W', inlineSource: { url: 'wm' } as any },
+      ]);
+      (findUnsplashInlineCandidates as unknown as vi.Mock).mockResolvedValueOnce([
+        { sourceId: 'U', inlineSource: { url: 'un' } as any },
+      ]);
+
+      const out = await fetchInlineCandidates('doji candlestick reversal', 'patterns');
+      expect(out[0].source).toBe('wikimedia');
+      expect(findLocalPressKitCandidates).not.toHaveBeenCalled();
+    });
+
+    it('falls back to legacy default order when no category is passed', async () => {
+      // Legacy DEFAULT_INLINE_SOURCES does not include local-press-kit, so the
+      // existing default-order test in this file remains correct.
+      (findFreepikCandidates as unknown as vi.Mock).mockResolvedValueOnce([
+        { sourceId: 'F', inlineSource: { url: 'fp' } as any },
+      ]);
+      (findWikimediaCandidates as unknown as vi.Mock).mockResolvedValueOnce([
+        { sourceId: 'W', inlineSource: { url: 'wm' } as any },
+      ]);
+
+      const out = await fetchInlineCandidates('q');
+      expect(out.map((c) => c.source)).toEqual(['freepik', 'wikimedia']);
+      expect(findLocalPressKitCandidates).not.toHaveBeenCalled();
+    });
   });
 });

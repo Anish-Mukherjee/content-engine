@@ -74,6 +74,7 @@ describe('fetchImage', () => {
     expect(pickUniqueInline).toHaveBeenCalledWith({
       query: 'bybit interface', caption: 'Bybit interface',
       articleId: a.id, position: 1, filenameStem: 'post-2-inline-1',
+      category: 'exchanges',
     });
   });
 

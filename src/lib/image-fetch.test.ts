@@ -191,6 +191,18 @@ describe('pickUniqueInline', () => {
     });
     expect(out).toBeNull();
   });
+
+  it('forwards category to fetchInlineCandidates so per-category routing fires', async () => {
+    (fetchInlineCandidates as unknown as vi.Mock).mockResolvedValueOnce([fpCand('1')]);
+    (isSourceIdUsed as unknown as vi.Mock).mockResolvedValue(false);
+    (isContentHashUsed as unknown as vi.Mock).mockResolvedValue(false);
+
+    await pickUniqueInline({
+      query: 'Bybit interface', caption: 'c', articleId: 'art',
+      position: 1, filenameStem: 's-inline-1', category: 'exchanges',
+    });
+    expect(fetchInlineCandidates).toHaveBeenCalledWith('Bybit interface', 'exchanges');
+  });
 });
 
 import { versionedImageUrl } from './paths';

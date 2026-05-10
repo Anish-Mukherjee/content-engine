@@ -15,6 +15,14 @@ export type SavedImage = {
 };
 
 export async function downloadBytes(url: string): Promise<ArrayBuffer> {
+  // Local-disk press-kit sources hand us file:// URLs — read from disk
+  // instead of fetch(). Same downstream pipeline (sharp re-encode, hash,
+  // save) so dedup and dimensions work identically to remote sources.
+  if (url.startsWith('file://')) {
+    const filePath = new URL(url).pathname;
+    const buf = await fs.readFile(filePath);
+    return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+  }
   const res = await fetch(url, {
     headers: { 'User-Agent': 'XeroGravity-ContentPipeline/1.0' },
   });

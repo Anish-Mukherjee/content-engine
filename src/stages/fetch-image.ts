@@ -26,7 +26,9 @@ export async function fetchImage(articleId: string): Promise<void> {
   const hero = await pickUniqueHero({
     category, articleId, slug: article.slug, altText, filenameStem: `${article.slug}-hero`,
   });
-  const processedHtml = await processInlinePlaceholders(article.articleHtml ?? '', article.slug, articleId);
+  const processedHtml = await processInlinePlaceholders(
+    article.articleHtml ?? '', article.slug, articleId, category,
+  );
 
   await db().update(articles).set({
     status: 'image_ready',
@@ -37,7 +39,7 @@ export async function fetchImage(articleId: string): Promise<void> {
 }
 
 async function processInlinePlaceholders(
-  articleHtml: string, slug: string, articleId: string,
+  articleHtml: string, slug: string, articleId: string, category: Category,
 ): Promise<string> {
   if (!articleHtml) return articleHtml;
 
@@ -51,7 +53,7 @@ async function processInlinePlaceholders(
     try {
       const resolved = await pickUniqueInline({
         query: placeholder.query, caption: placeholder.caption,
-        articleId, position: i + 1, filenameStem,
+        articleId, position: i + 1, filenameStem, category,
       });
       if (!resolved) {
         html = replacePlaceholder(html, placeholder, '');

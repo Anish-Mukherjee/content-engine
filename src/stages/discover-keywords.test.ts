@@ -1,9 +1,10 @@
 // src/stages/discover-keywords.test.ts
-import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest';
 import { sql } from 'drizzle-orm';
 import { db, closeDb } from '../db/client';
 import { seedKeywords, dataforseoTasks } from '../db/schema';
 import { discoverKeywords } from './discover-keywords';
+import { seedXgSite } from '../test/seed-xg';
 
 vi.mock('../integrations/dataforseo', () => ({
   submitKeywordTask: vi.fn(),
@@ -11,6 +12,7 @@ vi.mock('../integrations/dataforseo', () => ({
 import { submitKeywordTask } from '../integrations/dataforseo';
 
 describe('discoverKeywords', () => {
+  beforeAll(async () => { await seedXgSite(); });
   beforeEach(async () => {
     await db().execute(sql`TRUNCATE TABLE dataforseo_tasks, seed_keywords RESTART IDENTITY CASCADE`);
     (submitKeywordTask as unknown as vi.Mock).mockReset();

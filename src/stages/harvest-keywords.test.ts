@@ -1,9 +1,10 @@
 // src/stages/harvest-keywords.test.ts
-import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest';
 import { sql } from 'drizzle-orm';
 import { db, closeDb } from '../db/client';
 import { seedKeywords, dataforseoTasks, keywordResults, articles } from '../db/schema';
 import { harvestKeywords } from './harvest-keywords';
+import { seedXgSite } from '../test/seed-xg';
 
 vi.mock('../integrations/dataforseo', () => ({ fetchTaskResult: vi.fn() }));
 vi.mock('../integrations/claude', () => ({ checkRelevance: vi.fn() }));
@@ -15,6 +16,7 @@ async function resetAll() {
 }
 
 describe('harvestKeywords', () => {
+  beforeAll(async () => { await seedXgSite(); });
   beforeEach(async () => {
     await resetAll();
     (fetchTaskResult as unknown as vi.Mock).mockReset();

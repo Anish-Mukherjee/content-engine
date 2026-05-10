@@ -1,17 +1,19 @@
 // src/db/queries.test.ts
-import { describe, it, expect, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import { eq, sql } from 'drizzle-orm';
 import { db, closeDb } from './client';
 import { articles } from './schema';
 import { pickNextDrivable, getArticle, markFailed } from './queries';
 import { isSourceIdUsed, isContentHashUsed, recordImageUsage, clearImageUsageForArticle } from './queries';
 import { imageUsage } from './schema';
+import { seedXgSite } from '../test/seed-xg';
 
 async function truncate() {
   await db().execute(sql`TRUNCATE TABLE articles, keyword_results, dataforseo_tasks, seed_keywords RESTART IDENTITY CASCADE`);
 }
 
 describe('queries', () => {
+  beforeAll(async () => { await seedXgSite(); });
   beforeEach(async () => {
     await truncate();
   });

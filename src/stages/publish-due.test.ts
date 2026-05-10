@@ -1,16 +1,20 @@
 // src/stages/publish-due.test.ts
-import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll, beforeAll } from 'vitest';
 import { sql, eq } from 'drizzle-orm';
 import { db, closeDb } from '../db/client';
 import { articles } from '../db/schema';
 import { publishDue } from './publish-due';
+import { seedXgSite } from '../test/seed-xg';
 
 vi.mock('../integrations/frontend', () => ({ revalidate: vi.fn() }));
 vi.mock('../integrations/google-indexing', () => ({ submitUrl: vi.fn() }));
 import { revalidate } from '../integrations/frontend';
 import { submitUrl } from '../integrations/google-indexing';
 
+let xgSiteId: string;
+
 describe('publishDue', () => {
+  beforeAll(async () => { ({ siteId: xgSiteId } = await seedXgSite()); });
   beforeEach(async () => {
     await db().execute(sql`TRUNCATE TABLE articles CASCADE`);
     (revalidate as unknown as vi.Mock).mockReset().mockResolvedValue(undefined);
@@ -22,8 +26,8 @@ describe('publishDue', () => {
   it('publishes articles whose scheduledAt <= now', async () => {
     const past = new Date(Date.now() - 60 * 60 * 1000);
     const [a] = await db().insert(articles).values({
-      keyword: 'k', category: 'x', status: 'scheduled', slug: 'post-1', scheduledAt: past,
-    }).returning();
+      keyword: 'k', category: 'x', status: 'scheduled', slug: 'post-1', scheduledAt: past, siteId: xgSiteId,
+}).returning();
 
     await publishDue();
 
@@ -37,8 +41,8 @@ describe('publishDue', () => {
   it('leaves future-scheduled articles untouched', async () => {
     const future = new Date(Date.now() + 60 * 60 * 1000);
     const [a] = await db().insert(articles).values({
-      keyword: 'k', category: 'x', status: 'scheduled', slug: 'future', scheduledAt: future,
-    }).returning();
+      keyword: 'k', category: 'x', status: 'scheduled', slug: 'future', scheduledAt: future, siteId: xgSiteId,
+}).returning();
 
     await publishDue();
 
@@ -50,8 +54,8 @@ describe('publishDue', () => {
   it('still marks published when revalidate fails (soft-fail behaviour)', async () => {
     const past = new Date(Date.now() - 60 * 60 * 1000);
     const [a] = await db().insert(articles).values({
-      keyword: 'k', category: 'x', status: 'scheduled', slug: 'post-2', scheduledAt: past,
-    }).returning();
+      keyword: 'k', category: 'x', status: 'scheduled', slug: 'post-2', scheduledAt: past, siteId: xgSiteId,
+}).returning();
     // Even if revalidate throws, publishDue should not rollback
     (revalidate as unknown as vi.Mock).mockRejectedValueOnce(new Error('5xx'));
 

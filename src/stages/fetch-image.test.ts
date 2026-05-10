@@ -1,9 +1,10 @@
 // src/stages/fetch-image.test.ts
-import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll, beforeAll } from 'vitest';
 import { sql, eq } from 'drizzle-orm';
 import { db, closeDb } from '../db/client';
 import { articles } from '../db/schema';
 import { fetchImage } from './fetch-image';
+import { seedXgSite } from '../test/seed-xg';
 
 vi.mock('../lib/image-fetch', () => ({
   pickUniqueHero: vi.fn(),
@@ -23,7 +24,10 @@ const FALLBACK = {
   isFallback: true, contentHash: null,
 };
 
+let xgSiteId: string;
+
 describe('fetchImage', () => {
+  beforeAll(async () => { ({ siteId: xgSiteId } = await seedXgSite()); });
   beforeEach(async () => {
     await db().execute(sql`TRUNCATE TABLE articles CASCADE`);
     (pickUniqueHero as unknown as vi.Mock).mockReset();
@@ -34,8 +38,8 @@ describe('fetchImage', () => {
   it('fetches hero, leaves articleHtml untouched when no placeholders, advances to image_ready', async () => {
     const [a] = await db().insert(articles).values({
       keyword: 'k', category: 'exchanges', status: 'written', slug: 'post-1',
-      articleHtml: '<h2>Heading</h2><p>body</p>',
-    }).returning();
+      articleHtml: '<h2>Heading</h2><p>body</p>', siteId: xgSiteId,
+}).returning();
     (pickUniqueHero as unknown as vi.Mock).mockResolvedValueOnce(HERO);
 
     await fetchImage(a.id);
@@ -55,8 +59,8 @@ describe('fetchImage', () => {
       '<p>more</p>';
     const [a] = await db().insert(articles).values({
       keyword: 'k', category: 'exchanges', status: 'written', slug: 'post-2',
-      articleHtml: html,
-    }).returning();
+      articleHtml: html, siteId: xgSiteId,
+}).returning();
     (pickUniqueHero as unknown as vi.Mock).mockResolvedValueOnce(HERO);
     (pickUniqueInline as unknown as vi.Mock).mockResolvedValueOnce({
       figureHtml: '<figure class="article-image"><img src="https://cdn.example/inline.jpg" alt="Bybit interface" width="800" height="450" loading="lazy" /><figcaption>Bybit interface — <a href="https://example.com" target="_blank" rel="noopener noreferrer">example.com</a> (Creative Commons)</figcaption></figure>',
@@ -85,8 +89,8 @@ describe('fetchImage', () => {
       '<p>outro</p>';
     const [a] = await db().insert(articles).values({
       keyword: 'k', category: 'exchanges', status: 'written', slug: 'post-3',
-      articleHtml: html,
-    }).returning();
+      articleHtml: html, siteId: xgSiteId,
+}).returning();
     (pickUniqueHero as unknown as vi.Mock).mockResolvedValueOnce(HERO);
     (pickUniqueInline as unknown as vi.Mock).mockResolvedValueOnce(null);
 
@@ -105,8 +109,8 @@ describe('fetchImage', () => {
       '<div class="inline-image-placeholder" data-query="q" data-caption="c"></div>';
     const [a] = await db().insert(articles).values({
       keyword: 'k', category: 'exchanges', status: 'written', slug: 'post-4',
-      articleHtml: html,
-    }).returning();
+      articleHtml: html, siteId: xgSiteId,
+}).returning();
     (pickUniqueHero as unknown as vi.Mock).mockResolvedValueOnce(FALLBACK);
     (pickUniqueInline as unknown as vi.Mock).mockRejectedValueOnce(new Error('boom'));
 
@@ -120,8 +124,8 @@ describe('fetchImage', () => {
   it('falls back when Unsplash returns null', async () => {
     const [a] = await db().insert(articles).values({
       keyword: 'k', category: 'exchanges', status: 'written', slug: 'post-5',
-      articleHtml: '<p>no placeholders</p>',
-    }).returning();
+      articleHtml: '<p>no placeholders</p>', siteId: xgSiteId,
+}).returning();
     (pickUniqueHero as unknown as vi.Mock).mockResolvedValueOnce(FALLBACK);
 
     await fetchImage(a.id);
@@ -135,8 +139,8 @@ describe('fetchImage', () => {
   it('falls back on hero integration error — never blocks pipeline', async () => {
     const [a] = await db().insert(articles).values({
       keyword: 'k', category: 'exchanges', status: 'written', slug: 'post-6',
-      articleHtml: '<p>x</p>',
-    }).returning();
+      articleHtml: '<p>x</p>', siteId: xgSiteId,
+}).returning();
     (pickUniqueHero as unknown as vi.Mock).mockResolvedValueOnce(FALLBACK);
 
     await fetchImage(a.id);
@@ -148,8 +152,8 @@ describe('fetchImage', () => {
   it('passes articleId + slug + filenameStem to pickUniqueHero', async () => {
     const [a] = await db().insert(articles).values({
       keyword: 'k', category: 'indicators', status: 'written',
-      slug: 'my-slug', title: 'My Title', articleHtml: '<p>hi</p>',
-    }).returning();
+      slug: 'my-slug', title: 'My Title', articleHtml: '<p>hi</p>', siteId: xgSiteId,
+}).returning();
     (pickUniqueHero as unknown as vi.Mock).mockResolvedValueOnce({
       url: '/images/my-slug-hero.jpg', altText: 'My Title', width: 1200, height: 630,
       photographerName: null, photographerUrl: null, unsplashId: null,

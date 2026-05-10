@@ -48,7 +48,7 @@ describe('schema 0003 — additive multi-tenant tables', () => {
     );
   });
 
-  it('adds nullable site_id column to all existing pipeline tables', async () => {
+  it('site_id is NOT NULL on all 5 pipeline tables (locked down in plan 6)', async () => {
     const expected = ['articles','seed_keywords','keyword_results','dataforseo_tasks','image_usage'];
     for (const t of expected) {
       const rows = await db().execute<{ is_nullable: string }>(sql`
@@ -56,21 +56,24 @@ describe('schema 0003 — additive multi-tenant tables', () => {
         where table_schema='public' and table_name=${t} and column_name='site_id'
       `);
       expect(rows.length, `expected site_id column on ${t}`).toBe(1);
-      expect(rows[0]!.is_nullable, `${t}.site_id must still be nullable in plan 1`).toBe('YES');
+      expect(rows[0]!.is_nullable, `${t}.site_id must be NOT NULL after plan 6`).toBe('NO');
     }
   });
 
-  it('does NOT yet add a foreign key from articles.site_id to site.id (deferred to plan 4)', async () => {
-    const rows = await db().execute<{ constraint_name: string }>(sql`
-      select tc.constraint_name
-      from information_schema.table_constraints tc
-      join information_schema.key_column_usage kcu
-        on tc.constraint_name = kcu.constraint_name
-      where tc.table_name = 'articles'
-        and kcu.column_name = 'site_id'
-        and tc.constraint_type = 'FOREIGN KEY'
-    `);
-    expect(rows.length).toBe(0);
+  it('site_id has a foreign key to site.id on all 5 pipeline tables (added in plan 6)', async () => {
+    const expected = ['articles','seed_keywords','keyword_results','dataforseo_tasks','image_usage'];
+    for (const t of expected) {
+      const rows = await db().execute<{ constraint_name: string }>(sql`
+        select tc.constraint_name
+        from information_schema.table_constraints tc
+        join information_schema.key_column_usage kcu
+          on tc.constraint_name = kcu.constraint_name
+        where tc.table_name = ${t}
+          and kcu.column_name = 'site_id'
+          and tc.constraint_type = 'FOREIGN KEY'
+      `);
+      expect(rows.length, `expected FK on ${t}.site_id after plan 6`).toBeGreaterThanOrEqual(1);
+    }
   });
 });
 

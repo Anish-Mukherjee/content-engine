@@ -1,10 +1,11 @@
 // src/stages/research-topic.test.ts
-import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll, beforeAll } from 'vitest';
 import { sql, eq } from 'drizzle-orm';
 import { db, closeDb } from '../db/client';
 import { articles } from '../db/schema';
 import { researchTopic } from './research-topic';
 import type { PerplexityBrief } from '../integrations/perplexity/types';
+import { seedXgSite } from '../test/seed-xg';
 
 vi.mock('../integrations/perplexity', () => ({ researchKeyword: vi.fn() }));
 import { researchKeyword } from '../integrations/perplexity';
@@ -33,7 +34,10 @@ function briefFor(keyword: string, wc: number = 1400): PerplexityBrief {
   };
 }
 
+let xgSiteId: string;
+
 describe('researchTopic', () => {
+  beforeAll(async () => { ({ siteId: xgSiteId } = await seedXgSite()); });
   beforeEach(async () => {
     await db().execute(sql`TRUNCATE TABLE articles CASCADE`);
     (researchKeyword as unknown as vi.Mock).mockReset();
@@ -42,8 +46,8 @@ describe('researchTopic', () => {
 
   it('advances pending to researched with brief JSON', async () => {
     const [a] = await db().insert(articles).values({
-      keyword: 'bybit', category: 'exchanges', status: 'pending',
-    }).returning();
+      keyword: 'bybit', category: 'exchanges', status: 'pending', siteId: xgSiteId,
+}).returning();
     (researchKeyword as unknown as vi.Mock).mockResolvedValueOnce(briefFor('bybit', 1400));
 
     await researchTopic(a.id);
@@ -56,8 +60,8 @@ describe('researchTopic', () => {
 
   it('advances researching status if already transitioning (re-entrant)', async () => {
     const [a] = await db().insert(articles).values({
-      keyword: 'k', category: 'concepts', status: 'researching',
-    }).returning();
+      keyword: 'k', category: 'concepts', status: 'researching', siteId: xgSiteId,
+}).returning();
     (researchKeyword as unknown as vi.Mock).mockResolvedValueOnce(briefFor('k', 1200));
     await researchTopic(a.id);
     const [row] = await db().select().from(articles).where(eq(articles.id, a.id));
@@ -66,8 +70,8 @@ describe('researchTopic', () => {
 
   it('propagates integration errors (driver handles)', async () => {
     const [a] = await db().insert(articles).values({
-      keyword: 'k', category: 'concepts', status: 'pending',
-    }).returning();
+      keyword: 'k', category: 'concepts', status: 'pending', siteId: xgSiteId,
+}).returning();
     (researchKeyword as unknown as vi.Mock).mockRejectedValueOnce(new Error('boom'));
     await expect(researchTopic(a.id)).rejects.toThrow('boom');
   });

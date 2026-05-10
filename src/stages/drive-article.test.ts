@@ -1,9 +1,10 @@
 // src/stages/drive-article.test.ts
-import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll, beforeAll } from 'vitest';
 import { sql, eq } from 'drizzle-orm';
 import { db, closeDb } from '../db/client';
 import { articles } from '../db/schema';
 import { driveArticle } from './drive-article';
+import { seedXgSite } from '../test/seed-xg';
 
 vi.mock('./research-topic', () => ({ researchTopic: vi.fn() }));
 vi.mock('./outline-article', () => ({ outlineArticle: vi.fn() }));
@@ -17,7 +18,10 @@ import { writeArticle } from './write-article';
 import { fetchImage } from './fetch-image';
 import { queueArticle } from './queue-article';
 
+let xgSiteId: string;
+
 describe('driveArticle', () => {
+  beforeAll(async () => { ({ siteId: xgSiteId } = await seedXgSite()); });
   beforeEach(async () => {
     await db().execute(sql`TRUNCATE TABLE articles CASCADE`);
     for (const m of [researchTopic, outlineArticle, writeArticle, fetchImage, queueArticle]) {
@@ -28,8 +32,8 @@ describe('driveArticle', () => {
 
   it('runs the full chain for a pending article, advancing status between each stage', async () => {
     const [a] = await db().insert(articles).values({
-      keyword: 'k', category: 'exchanges', status: 'pending',
-    }).returning();
+      keyword: 'k', category: 'exchanges', status: 'pending', siteId: xgSiteId,
+}).returning();
     // Simulate each stage advancing the status in the DB
     (researchTopic as unknown as vi.Mock).mockImplementation(async (id: string) => {
       await db().update(articles).set({ status: 'researched' }).where(eq(articles.id, id));
@@ -60,8 +64,8 @@ describe('driveArticle', () => {
 
   it('halts and marks *_failed when a stage throws', async () => {
     const [a] = await db().insert(articles).values({
-      keyword: 'k', category: 'exchanges', status: 'pending',
-    }).returning();
+      keyword: 'k', category: 'exchanges', status: 'pending', siteId: xgSiteId,
+}).returning();
     (researchTopic as unknown as vi.Mock).mockImplementation(async (id: string) => {
       await db().update(articles).set({ status: 'researched' }).where(eq(articles.id, id));
     });

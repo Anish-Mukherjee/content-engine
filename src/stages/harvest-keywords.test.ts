@@ -15,8 +15,10 @@ async function resetAll() {
   await db().execute(sql`TRUNCATE TABLE articles, keyword_results, dataforseo_tasks, seed_keywords RESTART IDENTITY CASCADE`);
 }
 
+let xgSiteId: string;
+
 describe('harvestKeywords', () => {
-  beforeAll(async () => { await seedXgSite(); });
+  beforeAll(async () => { ({ siteId: xgSiteId } = await seedXgSite()); });
   beforeEach(async () => {
     await resetAll();
     (fetchTaskResult as unknown as vi.Mock).mockReset();
@@ -27,11 +29,11 @@ describe('harvestKeywords', () => {
 
   async function seedPendingTask() {
     const [seed] = await db().insert(seedKeywords).values({
-      keyword: 'seed', category: 'exchanges',
-    }).returning();
+      keyword: 'seed', category: 'exchanges', siteId: xgSiteId,
+}).returning();
     const [task] = await db().insert(dataforseoTasks).values({
-      externalTaskId: 'ext-1', seedKeywordId: seed.id, status: 'pending',
-    }).returning();
+      externalTaskId: 'ext-1', seedKeywordId: seed.id, status: 'pending', siteId: xgSiteId,
+}).returning();
     return { seed, task };
   }
 
@@ -85,8 +87,8 @@ describe('harvestKeywords', () => {
     // Prior article with same keyword, published
     await db().insert(articles).values({
       keyword: 'already published kw', category: 'exchanges', status: 'published',
-      slug: 'already-published-kw',
-    });
+      slug: 'already-published-kw', siteId: xgSiteId,
+});
     (fetchTaskResult as unknown as vi.Mock).mockResolvedValueOnce({
       complete: true,
       results: [
@@ -105,8 +107,8 @@ describe('harvestKeywords', () => {
     await seedPendingTask();
     await db().insert(articles).values({
       keyword: 'crypto trading bot', category: 'exchanges', status: 'published',
-      slug: 'crypto-trading-bot',
-    });
+      slug: 'crypto-trading-bot', siteId: xgSiteId,
+});
     (fetchTaskResult as unknown as vi.Mock).mockResolvedValueOnce({
       complete: true,
       results: [
@@ -157,8 +159,8 @@ describe('harvestKeywords', () => {
     // Recently-published bot article puts the bot cluster in cooldown.
     await db().insert(articles).values({
       keyword: 'ai bots for trading', category: 'automation', status: 'published',
-      slug: 'ai-bots-for-trading', publishedAt: new Date(),
-    });
+      slug: 'ai-bots-for-trading', publishedAt: new Date(), siteId: xgSiteId,
+});
     (fetchTaskResult as unknown as vi.Mock).mockResolvedValueOnce({
       complete: true,
       results: [
@@ -191,8 +193,8 @@ describe('harvestKeywords', () => {
       dataforseoTaskId: task.id,
       searchVolume: 1000,
       competition: 0.3,
-      status: 'approved',
-    });
+      status: 'approved', siteId: xgSiteId,
+});
 
     (fetchTaskResult as unknown as vi.Mock).mockResolvedValueOnce({
       complete: true,

@@ -1,14 +1,18 @@
 // src/stages/outline-article.test.ts
-import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll, beforeAll } from 'vitest';
 import { sql, eq } from 'drizzle-orm';
 import { db, closeDb } from '../db/client';
 import { articles } from '../db/schema';
 import { outlineArticle } from './outline-article';
+import { seedXgSite } from '../test/seed-xg';
 
 vi.mock('../integrations/claude', () => ({ generateOutline: vi.fn() }));
 import { generateOutline } from '../integrations/claude';
 
+let xgSiteId: string;
+
 describe('outlineArticle', () => {
+  beforeAll(async () => { ({ siteId: xgSiteId } = await seedXgSite()); });
   beforeEach(async () => {
     await db().execute(sql`TRUNCATE TABLE articles CASCADE`);
     (generateOutline as unknown as vi.Mock).mockReset();
@@ -32,8 +36,8 @@ describe('outlineArticle', () => {
         key_stats_to_include: [], recommended_tone: 'direct',
         recommended_title: 'Bybit', recommended_h2s: [], key_terms_to_include: [],
         word_count_recommendation: 1400, faq_questions: [],
-      },
-    }).returning();
+      }, siteId: xgSiteId,
+}).returning();
 
     (generateOutline as unknown as vi.Mock).mockResolvedValueOnce({
       title: 'Bybit Guide', slug: 'bybit-guide',
@@ -57,8 +61,8 @@ describe('outlineArticle', () => {
 
   it('throws when brief is missing', async () => {
     const [a] = await db().insert(articles).values({
-      keyword: 'x', category: 'concepts', status: 'researched',
-    }).returning();
+      keyword: 'x', category: 'concepts', status: 'researched', siteId: xgSiteId,
+}).returning();
     await expect(outlineArticle(a.id)).rejects.toThrow(/brief/i);
   });
 });

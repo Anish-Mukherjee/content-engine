@@ -1,12 +1,16 @@
 // src/server/routes/articles.test.ts
-import { describe, it, expect, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach, afterAll, beforeAll } from 'vitest';
 import request from 'supertest';
 import { sql } from 'drizzle-orm';
 import { db, closeDb } from '../../db/client';
 import { articles } from '../../db/schema';
 import { createApp } from '../app';
+import { seedXgSite } from '../../test/seed-xg';
+
+let xgSiteId: string;
 
 describe('articles routes', () => {
+  beforeAll(async () => { ({ siteId: xgSiteId } = await seedXgSite()); });
   const app = createApp();
 
   beforeEach(async () => {
@@ -17,9 +21,11 @@ describe('articles routes', () => {
   it('GET /api/articles returns only published rows', async () => {
     await db().insert(articles).values([
       { keyword: 'a', category: 'exchanges', status: 'published', slug: 'a',
-        title: 'A', metaDescription: 'da', publishedAt: new Date('2099-01-01') },
+        title: 'A', metaDescription: 'da', publishedAt: new Date('2099-01-01') , siteId: xgSiteId,
+},
       { keyword: 'b', category: 'exchanges', status: 'written', slug: 'b',
-        title: 'B', metaDescription: 'db' },
+        title: 'B', metaDescription: 'db' , siteId: xgSiteId,
+},
     ]);
     const res = await request(app).get('/api/articles');
     expect(res.status).toBe(200);
@@ -34,8 +40,8 @@ describe('articles routes', () => {
       title: 'T', metaTitle: 'MT', metaDescription: 'MD',
       articleHtml: '<h1>X</h1>', faqSchema: { x: 1 },
       heroImage: { url: '/images/post-1-hero.jpg', isFallback: false },
-      publishedAt: new Date(),
-    });
+      publishedAt: new Date(), siteId: xgSiteId,
+});
     const res = await request(app).get('/api/articles/post-1');
     expect(res.status).toBe(200);
     expect(res.body.slug).toBe('post-1');
@@ -46,16 +52,16 @@ describe('articles routes', () => {
 
   it('GET /api/articles/:slug returns 404 when unpublished or missing', async () => {
     await db().insert(articles).values({
-      keyword: 'k', category: 'exchanges', status: 'written', slug: 'not-yet',
-    });
+      keyword: 'k', category: 'exchanges', status: 'written', slug: 'not-yet', siteId: xgSiteId,
+});
     expect((await request(app).get('/api/articles/not-yet')).status).toBe(404);
     expect((await request(app).get('/api/articles/nope')).status).toBe(404);
   });
 
   it('GET /api/articles?category= filters by category and ignores invalid values', async () => {
     await db().insert(articles).values([
-      { keyword: 'a', category: 'exchanges', status: 'published', slug: 'a', publishedAt: new Date() },
-      { keyword: 'b', category: 'funding-rates', status: 'published', slug: 'b', publishedAt: new Date() },
+      { keyword: 'a', category: 'exchanges', status: 'published', slug: 'a', publishedAt: new Date() , siteId: xgSiteId},
+      { keyword: 'b', category: 'funding-rates', status: 'published', slug: 'b', publishedAt: new Date() , siteId: xgSiteId},
     ]);
     const valid = await request(app).get('/api/articles?category=exchanges');
     expect(valid.status).toBe(200);
@@ -77,8 +83,8 @@ describe('articles routes', () => {
   it('GET /api/sitemap-data returns slug + publishedAt + updatedAt', async () => {
     await db().insert(articles).values({
       keyword: 'k', category: 'exchanges', status: 'published', slug: 's',
-      publishedAt: new Date('2099-05-01'),
-    });
+      publishedAt: new Date('2099-05-01'), siteId: xgSiteId,
+});
     const res = await request(app).get('/api/sitemap-data');
     expect(res.status).toBe(200);
     expect(res.body.articles).toHaveLength(1);
@@ -92,6 +98,7 @@ describe('articles routes', () => {
       keyword: `kw-${i}`, category: 'exchanges' as const, status: 'published' as const,
       slug: `s-${i}`, title: `T${i}`, metaDescription: `MD${i}`,
       publishedAt: new Date(2099, 0, i + 1),
+      siteId: xgSiteId,
     }));
     await db().insert(articles).values(rows);
 
@@ -105,9 +112,9 @@ describe('articles routes', () => {
 
   it('GET /api/articles?category=X returns total scoped to that category', async () => {
     await db().insert(articles).values([
-      { keyword: 'a', category: 'exchanges', status: 'published', slug: 'a', publishedAt: new Date() },
-      { keyword: 'b', category: 'patterns',  status: 'published', slug: 'b', publishedAt: new Date() },
-      { keyword: 'c', category: 'patterns',  status: 'published', slug: 'c', publishedAt: new Date() },
+      { keyword: 'a', category: 'exchanges', status: 'published', slug: 'a', publishedAt: new Date() , siteId: xgSiteId},
+      { keyword: 'b', category: 'patterns',  status: 'published', slug: 'b', publishedAt: new Date() , siteId: xgSiteId},
+      { keyword: 'c', category: 'patterns',  status: 'published', slug: 'c', publishedAt: new Date() , siteId: xgSiteId},
     ]);
     const res = await request(app).get('/api/articles?category=patterns');
     expect(res.status).toBe(200);
@@ -118,11 +125,14 @@ describe('articles routes', () => {
   it('GET /api/articles?q= filters by title/keyword (case-insensitive) and ignores empty q', async () => {
     await db().insert(articles).values([
       { keyword: 'macd basics', category: 'indicators', status: 'published', slug: 's-1',
-        title: 'MACD Basics for Crypto Traders', metaDescription: 'd', publishedAt: new Date() },
+        title: 'MACD Basics for Crypto Traders', metaDescription: 'd', publishedAt: new Date() , siteId: xgSiteId,
+},
       { keyword: 'rsi divergence', category: 'indicators', status: 'published', slug: 's-2',
-        title: 'RSI Divergence Explained', metaDescription: 'd', publishedAt: new Date() },
+        title: 'RSI Divergence Explained', metaDescription: 'd', publishedAt: new Date() , siteId: xgSiteId,
+},
       { keyword: 'bybit fees', category: 'exchanges', status: 'published', slug: 's-3',
-        title: 'Bybit Fee Structure 2026', metaDescription: 'd', publishedAt: new Date() },
+        title: 'Bybit Fee Structure 2026', metaDescription: 'd', publishedAt: new Date() , siteId: xgSiteId,
+},
     ]);
 
     const titleHit = await request(app).get('/api/articles?q=macd');
@@ -145,9 +155,11 @@ describe('articles routes', () => {
   it('GET /api/articles?q= treats LIKE wildcards as literal characters', async () => {
     await db().insert(articles).values([
       { keyword: 'a', category: 'indicators', status: 'published', slug: 's-1',
-        title: 'Plain Title', metaDescription: 'd', publishedAt: new Date() },
+        title: 'Plain Title', metaDescription: 'd', publishedAt: new Date() , siteId: xgSiteId,
+},
       { keyword: 'b', category: 'indicators', status: 'published', slug: 's-2',
-        title: '100% APY Strategy', metaDescription: 'd', publishedAt: new Date() },
+        title: '100% APY Strategy', metaDescription: 'd', publishedAt: new Date() , siteId: xgSiteId,
+},
     ]);
     const res = await request(app).get('/api/articles?q=%25');
     expect(res.body.total).toBe(1);
@@ -157,9 +169,11 @@ describe('articles routes', () => {
   it('GET /api/articles?q=&category= combines filters', async () => {
     await db().insert(articles).values([
       { keyword: 'a', category: 'indicators', status: 'published', slug: 's-1',
-        title: 'MACD Indicator Guide', metaDescription: 'd', publishedAt: new Date() },
+        title: 'MACD Indicator Guide', metaDescription: 'd', publishedAt: new Date() , siteId: xgSiteId,
+},
       { keyword: 'b', category: 'patterns', status: 'published', slug: 's-2',
-        title: 'MACD on Pattern Breakouts', metaDescription: 'd', publishedAt: new Date() },
+        title: 'MACD on Pattern Breakouts', metaDescription: 'd', publishedAt: new Date() , siteId: xgSiteId,
+},
     ]);
     const res = await request(app).get('/api/articles?q=macd&category=indicators');
     expect(res.body.total).toBe(1);

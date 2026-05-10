@@ -1,10 +1,11 @@
 // src/stages/write-article.test.ts
-import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll, beforeAll } from 'vitest';
 import { sql, eq } from 'drizzle-orm';
 import { db, closeDb } from '../db/client';
 import { articles } from '../db/schema';
 import { writeArticle } from './write-article';
 import type { PerplexityBrief } from '../integrations/perplexity/types';
+import { seedXgSite } from '../test/seed-xg';
 
 vi.mock('../integrations/claude', () => ({ writeArticleBody: vi.fn() }));
 import { writeArticleBody } from '../integrations/claude';
@@ -33,7 +34,10 @@ const BRIEF: PerplexityBrief = {
   word_count_recommendation: 1400, faq_questions: [],
 };
 
+let xgSiteId: string;
+
 describe('writeArticle', () => {
+  beforeAll(async () => { ({ siteId: xgSiteId } = await seedXgSite()); });
   beforeEach(async () => {
     await db().execute(sql`TRUNCATE TABLE articles CASCADE`);
     (writeArticleBody as unknown as vi.Mock).mockReset();
@@ -44,8 +48,8 @@ describe('writeArticle', () => {
     const [a] = await db().insert(articles).values({
       keyword: 'k', category: 'concepts', status: 'outlined',
       outline: OUTLINE_JSON, perplexityBrief: BRIEF,
-      secondaryKeywords: ['k2'],
-    }).returning();
+      secondaryKeywords: ['k2'], siteId: xgSiteId,
+}).returning();
 
     const longBody = Array.from({ length: 1100 }, (_, i) => `word${i}`).join(' ');
     // Body intentionally starts with an <h1> — the sanitizer must strip it so the
@@ -72,8 +76,8 @@ describe('writeArticle', () => {
     const [a] = await db().insert(articles).values({
       keyword: 'k', category: 'concepts', status: 'outlined',
       outline: OUTLINE_JSON, perplexityBrief: BRIEF,
-      secondaryKeywords: [],
-    }).returning();
+      secondaryKeywords: [], siteId: xgSiteId,
+}).returning();
 
     const longBody = Array.from({ length: 1100 }, (_, i) => `w${i}`).join(' ');
     (writeArticleBody as unknown as vi.Mock).mockResolvedValueOnce(
@@ -91,8 +95,8 @@ describe('writeArticle', () => {
   it('throws TerminalError if output is under 1000 words', async () => {
     const [a] = await db().insert(articles).values({
       keyword: 'k', category: 'concepts', status: 'outlined',
-      outline: OUTLINE_JSON, perplexityBrief: BRIEF,
-    }).returning();
+      outline: OUTLINE_JSON, perplexityBrief: BRIEF, siteId: xgSiteId,
+}).returning();
     (writeArticleBody as unknown as vi.Mock).mockResolvedValueOnce('<h1>Hi</h1><p>tiny</p>');
     await expect(writeArticle(a.id)).rejects.toThrow(/too short/i);
   });
@@ -100,8 +104,8 @@ describe('writeArticle', () => {
   it('extracts FAQ schema when FAQ items present', async () => {
     const [a] = await db().insert(articles).values({
       keyword: 'k', category: 'concepts', status: 'outlined',
-      outline: OUTLINE_JSON, perplexityBrief: BRIEF,
-    }).returning();
+      outline: OUTLINE_JSON, perplexityBrief: BRIEF, siteId: xgSiteId,
+}).returning();
 
     const longBody = Array.from({ length: 1100 }, () => 'word').join(' ');
     const body = [

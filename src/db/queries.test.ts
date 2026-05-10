@@ -12,8 +12,10 @@ async function truncate() {
   await db().execute(sql`TRUNCATE TABLE articles, keyword_results, dataforseo_tasks, seed_keywords RESTART IDENTITY CASCADE`);
 }
 
+let xgSiteId: string;
+
 describe('queries', () => {
-  beforeAll(async () => { await seedXgSite(); });
+  beforeAll(async () => { ({ siteId: xgSiteId } = await seedXgSite()); });
   beforeEach(async () => {
     await truncate();
   });
@@ -24,11 +26,11 @@ describe('queries', () => {
 
   it('pickNextDrivable returns oldest pending when no failed', async () => {
     const [a] = await db().insert(articles).values({
-      keyword: 'a', category: 'exchanges', status: 'pending',
-    }).returning();
+      keyword: 'a', category: 'exchanges', status: 'pending', siteId: xgSiteId,
+}).returning();
     const [b] = await db().insert(articles).values({
-      keyword: 'b', category: 'exchanges', status: 'pending',
-    }).returning();
+      keyword: 'b', category: 'exchanges', status: 'pending', siteId: xgSiteId,
+}).returning();
 
     const picked = await pickNextDrivable();
     expect(picked?.id).toBe(a.id);
@@ -36,11 +38,11 @@ describe('queries', () => {
 
   it('pickNextDrivable prefers retryable failed over pending', async () => {
     const [pending] = await db().insert(articles).values({
-      keyword: 'p', category: 'exchanges', status: 'pending',
-    }).returning();
+      keyword: 'p', category: 'exchanges', status: 'pending', siteId: xgSiteId,
+}).returning();
     const [failed] = await db().insert(articles).values({
-      keyword: 'f', category: 'exchanges', status: 'write_failed', retryCount: 1,
-    }).returning();
+      keyword: 'f', category: 'exchanges', status: 'write_failed', retryCount: 1, siteId: xgSiteId,
+}).returning();
 
     const picked = await pickNextDrivable();
     expect(picked?.id).toBe(failed.id);
@@ -48,8 +50,8 @@ describe('queries', () => {
 
   it('pickNextDrivable skips failed with retryCount >= 3', async () => {
     await db().insert(articles).values({
-      keyword: 'exhausted', category: 'exchanges', status: 'write_failed', retryCount: 3,
-    });
+      keyword: 'exhausted', category: 'exchanges', status: 'write_failed', retryCount: 3, siteId: xgSiteId,
+});
     const picked = await pickNextDrivable();
     expect(picked).toBeUndefined();
   });
@@ -58,22 +60,22 @@ describe('queries', () => {
     // automation was published recently
     await db().insert(articles).values({
       keyword: 'old auto', category: 'automation', status: 'published',
-      slug: 'old-auto', publishedAt: new Date('2026-04-30T03:00:00Z'),
-    });
+      slug: 'old-auto', publishedAt: new Date('2026-04-30T03:00:00Z'), siteId: xgSiteId,
+});
     // strategies was published a long time ago
     await db().insert(articles).values({
       keyword: 'old strat', category: 'strategies', status: 'published',
-      slug: 'old-strat', publishedAt: new Date('2026-03-01T03:00:00Z'),
-    });
+      slug: 'old-strat', publishedAt: new Date('2026-03-01T03:00:00Z'), siteId: xgSiteId,
+});
     // Both have pending rows — automation row was created earlier (would win FIFO)
     const [autoPending] = await db().insert(articles).values({
       keyword: 'pending auto', category: 'automation', status: 'pending',
-      createdAt: new Date('2026-04-23T13:25:53Z'),
-    }).returning();
+      createdAt: new Date('2026-04-23T13:25:53Z'), siteId: xgSiteId,
+}).returning();
     const [stratPending] = await db().insert(articles).values({
       keyword: 'pending strat', category: 'strategies', status: 'pending',
-      createdAt: new Date('2026-04-26T13:25:53Z'),
-    }).returning();
+      createdAt: new Date('2026-04-26T13:25:53Z'), siteId: xgSiteId,
+}).returning();
 
     const picked = await pickNextDrivable();
     // strategies hasn't been published since 2026-03-01, automation was 2026-04-30
@@ -84,16 +86,16 @@ describe('queries', () => {
   it('pickNextDrivable prefers never-published category over recently-published', async () => {
     await db().insert(articles).values({
       keyword: 'old auto', category: 'automation', status: 'published',
-      slug: 'old-auto', publishedAt: new Date('2026-04-30T03:00:00Z'),
-    });
+      slug: 'old-auto', publishedAt: new Date('2026-04-30T03:00:00Z'), siteId: xgSiteId,
+});
     const [autoPending] = await db().insert(articles).values({
       keyword: 'pending auto', category: 'automation', status: 'pending',
-      createdAt: new Date('2026-04-01T00:00:00Z'),
-    }).returning();
+      createdAt: new Date('2026-04-01T00:00:00Z'), siteId: xgSiteId,
+}).returning();
     const [riskPending] = await db().insert(articles).values({
       keyword: 'pending risk', category: 'risk', status: 'pending',
-      createdAt: new Date('2026-04-26T00:00:00Z'),
-    }).returning();
+      createdAt: new Date('2026-04-26T00:00:00Z'), siteId: xgSiteId,
+}).returning();
 
     const picked = await pickNextDrivable();
     // 'risk' has never been published → it wins regardless of created_at
@@ -104,12 +106,12 @@ describe('queries', () => {
     // Only one category has pending rows
     const [first] = await db().insert(articles).values({
       keyword: 'first', category: 'automation', status: 'pending',
-      createdAt: new Date('2026-04-23T13:00:00Z'),
-    }).returning();
+      createdAt: new Date('2026-04-23T13:00:00Z'), siteId: xgSiteId,
+}).returning();
     await db().insert(articles).values({
       keyword: 'second', category: 'automation', status: 'pending',
-      createdAt: new Date('2026-04-24T13:00:00Z'),
-    });
+      createdAt: new Date('2026-04-24T13:00:00Z'), siteId: xgSiteId,
+});
     const picked = await pickNextDrivable();
     expect(picked?.id).toBe(first.id);
   });
@@ -119,18 +121,18 @@ describe('queries', () => {
     await db().insert(articles).values({
       keyword: 'ai bots for trading', category: 'automation', status: 'published',
       slug: 'ai-bots-for-trading',
-      publishedAt: new Date(),
-    });
+      publishedAt: new Date(), siteId: xgSiteId,
+});
     // Pending bot article (same cluster) — should be skipped.
     await db().insert(articles).values({
       keyword: 'best crypto trading bot for beginners', category: 'automation', status: 'pending',
-      createdAt: new Date('2026-04-23T13:00:00Z'),
-    });
+      createdAt: new Date('2026-04-23T13:00:00Z'), siteId: xgSiteId,
+});
     // Pending non-bot article — should win.
     const [winner] = await db().insert(articles).values({
       keyword: 'crypto market structure', category: 'analysis', status: 'pending',
-      createdAt: new Date('2026-04-23T13:30:00Z'),
-    }).returning();
+      createdAt: new Date('2026-04-23T13:30:00Z'), siteId: xgSiteId,
+}).returning();
 
     const picked = await pickNextDrivable();
     expect(picked?.id).toBe(winner.id);
@@ -140,11 +142,11 @@ describe('queries', () => {
     await db().insert(articles).values({
       keyword: 'ai bots for trading', category: 'automation', status: 'published',
       slug: 'ai-bots-for-trading',
-      publishedAt: new Date(),
-    });
+      publishedAt: new Date(), siteId: xgSiteId,
+});
     await db().insert(articles).values({
-      keyword: 'best crypto trading bot for beginners', category: 'automation', status: 'pending',
-    });
+      keyword: 'best crypto trading bot for beginners', category: 'automation', status: 'pending', siteId: xgSiteId,
+});
     const picked = await pickNextDrivable();
     expect(picked).toBeUndefined();
   });
@@ -154,11 +156,11 @@ describe('queries', () => {
     const longAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     await db().insert(articles).values({
       keyword: 'ai bots for trading', category: 'automation', status: 'published',
-      slug: 'ai-bots-old', publishedAt: longAgo, createdAt: longAgo,
-    });
+      slug: 'ai-bots-old', publishedAt: longAgo, createdAt: longAgo, siteId: xgSiteId,
+});
     const [bot] = await db().insert(articles).values({
-      keyword: 'best crypto trading bot for beginners', category: 'automation', status: 'pending',
-    }).returning();
+      keyword: 'best crypto trading bot for beginners', category: 'automation', status: 'pending', siteId: xgSiteId,
+}).returning();
     const picked = await pickNextDrivable();
     expect(picked?.id).toBe(bot.id);
   });
@@ -167,16 +169,16 @@ describe('queries', () => {
     // Two categories, both have NULL last-activity (never published, no in-flight).
     const [coinA] = await db().insert(articles).values({
       keyword: 'btc futures', category: 'coins', status: 'pending',
-      createdAt: new Date('2026-04-23T13:00:00Z'),
-    }).returning();
+      createdAt: new Date('2026-04-23T13:00:00Z'), siteId: xgSiteId,
+}).returning();
     await db().insert(articles).values({
       keyword: 'eth futures', category: 'coins', status: 'pending',
-      createdAt: new Date('2026-04-23T13:01:00Z'),
-    });
+      createdAt: new Date('2026-04-23T13:01:00Z'), siteId: xgSiteId,
+});
     const [eduA] = await db().insert(articles).values({
       keyword: 'how to trade', category: 'education', status: 'pending',
-      createdAt: new Date('2026-04-23T13:30:00Z'),
-    }).returning();
+      createdAt: new Date('2026-04-23T13:30:00Z'), siteId: xgSiteId,
+}).returning();
 
     // Pick 1: oldest createdAt across NULL-last-activity categories → coinA
     const pick1 = await pickNextDrivable();
@@ -195,11 +197,11 @@ describe('queries', () => {
     // the daily batch. Both ticks now pass the previous tick's id so a second
     // candidate gets a chance.
     const [poisoned] = await db().insert(articles).values({
-      keyword: 'poisoned', category: 'exchanges', status: 'write_failed', retryCount: 1,
-    }).returning();
+      keyword: 'poisoned', category: 'exchanges', status: 'write_failed', retryCount: 1, siteId: xgSiteId,
+}).returning();
     const [pending] = await db().insert(articles).values({
-      keyword: 'fresh', category: 'analysis', status: 'pending',
-    }).returning();
+      keyword: 'fresh', category: 'analysis', status: 'pending', siteId: xgSiteId,
+}).returning();
 
     // No exclusion → poisoned wins (retryable beats pending)
     const first = await pickNextDrivable();
@@ -212,8 +214,8 @@ describe('queries', () => {
 
   it('markFailed sets status, increments retryCount, records lastError', async () => {
     const [a] = await db().insert(articles).values({
-      keyword: 'x', category: 'exchanges', status: 'writing',
-    }).returning();
+      keyword: 'x', category: 'exchanges', status: 'writing', siteId: xgSiteId,
+}).returning();
     await markFailed(a.id, 'write_failed', new Error('boom'));
     const after = await getArticle(a.id);
     expect(after?.status).toBe('write_failed');
@@ -228,8 +230,8 @@ describe('image_usage helpers', () => {
     await db().delete(imageUsage);
     await db().delete(articles);
     const [row] = await db().insert(articles).values({
-      keyword: 'k', category: 'indicators', status: 'pending',
-    }).returning({ id: articles.id });
+      keyword: 'k', category: 'indicators', status: 'pending', siteId: xgSiteId,
+}).returning({ id: articles.id });
     articleId = row.id;
   });
 
@@ -267,8 +269,8 @@ describe('image_usage helpers', () => {
 
   it('clearImageUsageForArticle removes only that articles rows', async () => {
     const [other] = await db().insert(articles).values({
-      keyword: 'k2', category: 'indicators', status: 'pending',
-    }).returning({ id: articles.id });
+      keyword: 'k2', category: 'indicators', status: 'pending', siteId: xgSiteId,
+}).returning({ id: articles.id });
     await recordImageUsage({
       articleId, role: 'hero', position: null,
       url: '/images/a-hero.jpg', source: 'unsplash', sourceId: 'A',

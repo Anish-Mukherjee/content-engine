@@ -1,6 +1,7 @@
 // scripts/dedupe-pending-articles.test.ts
-import { describe, it, expect, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach, afterAll, beforeAll } from 'vitest';
 import { sql, eq } from 'drizzle-orm';
+import { seedXgSite } from '../src/test/seed-xg';
 
 import { db, closeDb } from '../src/db/client';
 import { articles } from '../src/db/schema';
@@ -20,12 +21,15 @@ async function insertArticle(row: Partial<Article> & { keyword: string }): Promi
     searchVolume: row.searchVolume ?? 100,
     createdAt: row.createdAt ?? new Date(),
     publishedAt: row.publishedAt,
-    slug: row.slug,
-  }).returning();
+    slug: row.slug, siteId: xgSiteId,
+}).returning();
   return a;
 }
 
+let xgSiteId: string;
+
 describe('buildDedupePlan', () => {
+  beforeAll(async () => { ({ siteId: xgSiteId } = await seedXgSite()); });
   it('returns empty plan when no duplicates exist', () => {
     const candidates = [
       { id: '1', keyword: 'rsi crypto strategy', category: 'indicators', status: 'pending', searchVolume: 100, createdAt: new Date() } as Article,

@@ -11,8 +11,10 @@ vi.mock('../integrations/dataforseo', () => ({
 }));
 import { submitKeywordTask } from '../integrations/dataforseo';
 
+let xgSiteId: string;
+
 describe('discoverKeywords', () => {
-  beforeAll(async () => { await seedXgSite(); });
+  beforeAll(async () => { ({ siteId: xgSiteId } = await seedXgSite()); });
   beforeEach(async () => {
     await db().execute(sql`TRUNCATE TABLE dataforseo_tasks, seed_keywords RESTART IDENTITY CASCADE`);
     (submitKeywordTask as unknown as vi.Mock).mockReset();
@@ -26,7 +28,7 @@ describe('discoverKeywords', () => {
                   'automation', 'risk', 'coins', 'education', 'analysis'];
     for (const cat of cats) {
       for (let i = 0; i < 3; i++) {
-        await db().insert(seedKeywords).values({ keyword: `${cat}-${i}`, category: cat });
+        await db().insert(seedKeywords).values({ keyword: `${cat}-${i}`, category: cat , siteId: xgSiteId});
       }
     }
     (submitKeywordTask as unknown as vi.Mock).mockImplementation(async (kw: string) =>
@@ -45,7 +47,7 @@ describe('discoverKeywords', () => {
 
   it('takes what is available when a category is under-seeded', async () => {
     // Only one "exchanges" seed, rotation asks for 3 — should warn and submit just 1 for that category
-    await db().insert(seedKeywords).values({ keyword: 'only-one', category: 'exchanges' });
+    await db().insert(seedKeywords).values({ keyword: 'only-one', category: 'exchanges' , siteId: xgSiteId});
     (submitKeywordTask as unknown as vi.Mock).mockImplementation(async (kw: string) =>
       ({ externalTaskId: `task-${kw}` }));
 

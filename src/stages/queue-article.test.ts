@@ -1,11 +1,15 @@
 // src/stages/queue-article.test.ts
-import { describe, it, expect, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach, afterAll, beforeAll } from 'vitest';
 import { sql, eq } from 'drizzle-orm';
 import { db, closeDb } from '../db/client';
 import { articles } from '../db/schema';
 import { queueArticle, getNextSlot } from './queue-article';
+import { seedXgSite } from '../test/seed-xg';
+
+let xgSiteId: string;
 
 describe('queueArticle', () => {
+  beforeAll(async () => { ({ siteId: xgSiteId } = await seedXgSite()); });
   beforeEach(async () => {
     await db().execute(sql`TRUNCATE TABLE articles CASCADE`);
     process.env.PUBLISH_HOUR_UTC = '9';
@@ -14,8 +18,8 @@ describe('queueArticle', () => {
 
   it('schedules an article for the next 09:00 UTC slot', async () => {
     const [a] = await db().insert(articles).values({
-      keyword: 'k', category: 'exchanges', status: 'image_ready', slug: 's',
-    }).returning();
+      keyword: 'k', category: 'exchanges', status: 'image_ready', slug: 's', siteId: xgSiteId,
+}).returning();
     const before = new Date();
     await queueArticle(a.id);
     const [row] = await db().select().from(articles).where(eq(articles.id, a.id));
@@ -28,11 +32,11 @@ describe('queueArticle', () => {
 
   it('queues two consecutive articles for the SAME slot (same-time batch)', async () => {
     const [a] = await db().insert(articles).values({
-      keyword: 'a', category: 'exchanges', status: 'image_ready', slug: 'a',
-    }).returning();
+      keyword: 'a', category: 'exchanges', status: 'image_ready', slug: 'a', siteId: xgSiteId,
+}).returning();
     const [b] = await db().insert(articles).values({
-      keyword: 'b', category: 'exchanges', status: 'image_ready', slug: 'b',
-    }).returning();
+      keyword: 'b', category: 'exchanges', status: 'image_ready', slug: 'b', siteId: xgSiteId,
+}).returning();
 
     await queueArticle(a.id);
     await queueArticle(b.id);

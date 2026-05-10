@@ -15,3 +15,6 @@ storage/exchange-assets/**/*.png
 storage/exchange-assets/**/*.webp
 !storage/exchange-assets/**/README.md
 .DS_Store
+
+# Prod DB snapshots — never commit
+prod-snapshot-*.sql

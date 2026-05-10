@@ -128,7 +128,8 @@ export type RecordImageUsageInput = {
 };
 
 export async function recordImageUsage(input: RecordImageUsageInput): Promise<void> {
-  await db().insert(imageUsage).values(input);
+  const siteId = await getDefaultSiteId();
+  await db().insert(imageUsage).values({ ...input, siteId });
 }
 
 export async function isSourceIdUsed(source: string, sourceId: string): Promise<boolean> {

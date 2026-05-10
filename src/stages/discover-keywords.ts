@@ -4,6 +4,7 @@ import { asc, eq, sql } from 'drizzle-orm';
 import { CATEGORIES, WEEKLY_ROTATION_COUNTS } from '../config/categories';
 import type { Category } from '../config/categories';
 import { db } from '../db/client';
+import { getDefaultSiteId } from '../db/queries';
 import { dataforseoTasks, seedKeywords } from '../db/schema';
 import { submitKeywordTask } from '../integrations/dataforseo';
 import { logger } from '../lib/logger';
@@ -30,12 +31,15 @@ export async function discoverKeywords(): Promise<void> {
 
   logger.info({ count: selected.length }, 'submitting seeds to DataForSEO');
 
+  const siteId = await getDefaultSiteId();
+
   for (const s of selected) {
     const { externalTaskId } = await submitKeywordTask(s.keyword);
     await db().insert(dataforseoTasks).values({
       externalTaskId,
       seedKeywordId: s.id,
       status: 'pending',
+      siteId,
     });
     await db()
       .update(seedKeywords)

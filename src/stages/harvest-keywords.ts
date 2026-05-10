@@ -5,6 +5,7 @@ import { BRAND } from '../config/brand';
 import { isCategory, type Category } from '../config/categories';
 import { FILTERS } from '../config/filters';
 import { db } from '../db/client';
+import { getDefaultSiteId } from '../db/queries';
 import { articles, dataforseoTasks, keywordResults, seedKeywords } from '../db/schema';
 import { checkRelevance } from '../integrations/claude';
 import { fetchTaskResult } from '../integrations/dataforseo';
@@ -57,6 +58,7 @@ async function harvestOne(task: PendingTask) {
   if (!result.complete) return;
 
   const category: Category = isCategory(task.category) ? task.category : 'concepts';
+  const siteId = await getDefaultSiteId();
 
   // Insert raw results as pending_filter
   const insertedIds: string[] = [];
@@ -72,6 +74,7 @@ async function harvestOne(task: PendingTask) {
       keywordDifficulty: r.keywordDifficulty,
       trend: r.trend,
       status: 'pending_filter',
+      siteId,
     }).returning();
     insertedIds.push(row.id);
   }
@@ -244,6 +247,8 @@ async function applyPass3Filters(ids: string[]) {
       eq(keywordResults.status, 'pending_filter'),
     ));
 
+  const siteId = await getDefaultSiteId();
+
   for (let i = 0; i < candidates.length; i += RELEVANCE_BATCH_SIZE) {
     const batch = candidates.slice(i, i + RELEVANCE_BATCH_SIZE);
     const verdicts = await checkRelevance(batch.map((c) => c.keyword), BRAND);
@@ -258,6 +263,7 @@ async function applyPass3Filters(ids: string[]) {
           keyword: c.keyword,
           category: c.category,
           status: 'pending',
+          siteId,
         });
       } else {
         await db().update(keywordResults)

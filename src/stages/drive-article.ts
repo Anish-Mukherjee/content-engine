@@ -25,8 +25,11 @@ const STEPS: readonly Step[] = [
   { name: 'queue',    fn: queueArticle,   allowedStatuses: ['image_ready', 'queue_failed'] },
 ];
 
-export async function driveArticle(excludeIds: string[] = []): Promise<string | undefined> {
-  const article = await pickNextDrivable(excludeIds);
+export async function driveArticle(
+  excludeIds: string[] = [],
+  excludeCategories: string[] = [],
+): Promise<string | undefined> {
+  const article = await pickNextDrivable(excludeIds, excludeCategories);
   if (!article) {
     logger.info('no drivable article');
     return undefined;

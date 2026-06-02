@@ -8,6 +8,8 @@ import { discoverKeywords } from '../stages/discover-keywords';
 import { harvestKeywords } from '../stages/harvest-keywords';
 import { driveArticle } from '../stages/drive-article';
 import { publishDue } from '../stages/publish-due';
+import { monitorDiversity } from '../stages/monitor-diversity';
+import { getArticle } from '../db/queries';
 
 type Handler = () => Promise<void>;
 
@@ -17,10 +19,32 @@ async function driveDailyBatch(): Promise<void> {
   // can't monopolise both ticks (May 2026 incident: one bad brief blocked the
   // entire day's batch by re-being picked as the oldest retryable).
   const attempted: string[] = [];
+  // Track categories already driven so the day's articles never share a
+  // category — the "unique category per day" requirement. Without this, when
+  // topic cooldown filters out every other category's candidates the batch
+  // collapses onto one category (June 2026 fear-and-greed incident: 4 straight
+  // days of 2 analysis articles each).
+  const drivenCategories = new Set<string>();
+  let driven = 0;
   for (let i = 0; i < n; i++) {
-    const id = await driveArticle(attempted);
+    const id = await driveArticle(attempted, [...drivenCategories]);
     if (!id) break;
     attempted.push(id);
+    const art = await getArticle(id);
+    if (art?.category) drivenCategories.add(art.category);
+    if (art?.status === 'scheduled') driven++;
+  }
+  // Fail safe: publishing FEWER articles is correct when no fresh topic in a
+  // new category is available. A light day beats a repetitive one. Alert so the
+  // queue gets re-stocked rather than silently degrading.
+  if (driven < n) {
+    logger.warn({ target: n, driven }, 'daily batch under-filled');
+    await notifyWebhook(env().WEBHOOK_URL, {
+      event: 'batch_underfilled',
+      target: n,
+      driven,
+      reason: 'no fresh topic available in an undriven category (topic cooldown / queue starvation)',
+    });
   }
 }
 
@@ -60,5 +84,10 @@ export function startScheduler(): void {
   // Hourly :00 — publish articles whose scheduledAt <= now
   cron.schedule('0 * * * *', () => run('publishDue', publishDue), { timezone: 'UTC' });
 
-  logger.info('scheduler started: 4 cron jobs registered (UTC)');
+  // Daily 04:00 UTC — recurrence watchdog. Alerts if the recently-published
+  // feed has collapsed onto too few categories or one topic, so a future
+  // saturation regression is caught automatically instead of by a human noticing.
+  cron.schedule('0 4 * * *', () => run('monitorDiversity', monitorDiversity), { timezone: 'UTC' });
+
+  logger.info('scheduler started: 5 cron jobs registered (UTC)');
 }

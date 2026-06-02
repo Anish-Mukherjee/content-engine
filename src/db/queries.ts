@@ -1,7 +1,7 @@
 // src/db/queries.ts
 import { and, asc, eq, gte, lt, sql } from 'drizzle-orm';
 
-import { CLUSTER_COOLDOWN_DAYS, clusterTags, intersects } from '../config/topic-clusters';
+import { CLUSTER_COOLDOWN_DAYS, saturationTags, intersects } from '../config/topic-clusters';
 import { db } from './client';
 import { articles, imageUsage, site } from './schema';
 
@@ -36,13 +36,17 @@ export async function getCooldownClusters(daysAgo: number = CLUSTER_COOLDOWN_DAY
     .where(and(eq(articles.status, 'published'), gte(articles.publishedAt, cutoff)));
   const result = new Set<string>();
   for (const r of recent) {
-    for (const t of clusterTags(r.keyword)) result.add(t);
+    for (const t of saturationTags(r.keyword)) result.add(t);
   }
   return result;
 }
 
-export async function pickNextDrivable(excludeIds: string[] = []) {
+// excludeCategories enforces per-day category diversity: driveDailyBatch passes
+// the categories already driven in the current batch so the day's articles
+// never share a category (the "unique category per day" requirement).
+export async function pickNextDrivable(excludeIds: string[] = [], excludeCategories: string[] = []) {
   const excludeSet = new Set(excludeIds);
+  const excludeCats = new Set(excludeCategories);
 
   const retryables = await db()
     .select()
@@ -55,7 +59,7 @@ export async function pickNextDrivable(excludeIds: string[] = []) {
     )
     .orderBy(asc(articles.updatedAt));
   for (const r of retryables) {
-    if (!excludeSet.has(r.id)) return r;
+    if (!excludeSet.has(r.id) && !excludeCats.has(r.category)) return r;
   }
 
   // Round-robin across categories. Pick the category whose most recent activity
@@ -93,7 +97,8 @@ export async function pickNextDrivable(excludeIds: string[] = []) {
 
   for (const c of candidates) {
     if (excludeSet.has(c.id)) continue;
-    if (intersects(clusterTags(c.keyword), cooldown)) continue;
+    if (excludeCats.has(c.category)) continue;
+    if (intersects(saturationTags(c.keyword), cooldown)) continue;
     return c;
   }
   return undefined;

@@ -151,6 +151,55 @@ describe('queries', () => {
     expect(picked).toBeUndefined();
   });
 
+  // ── June 2026 fear-and-greed regression ─────────────────────────────────
+  // "fear and greed" has no cluster anchor, so the old clusterTags-based
+  // cooldown never saw it → it published every single day. saturationTags
+  // derives a key from the keyword itself, so a recently-published clusterless
+  // topic now correctly suppresses its near-duplicates.
+  it('pickNextDrivable skips a clusterless topic recently published (fear-greed)', async () => {
+    await db().insert(articles).values({
+      keyword: 'crypto fear and greed index', category: 'analysis', status: 'published',
+      slug: 'fng-published', publishedAt: new Date(), siteId: xgSiteId,
+    });
+    // A DIFFERENT fear-greed keyword — distinct token-set signature, still clusterless.
+    await db().insert(articles).values({
+      keyword: 'fear and greed index today', category: 'analysis', status: 'pending', siteId: xgSiteId,
+    });
+    const picked = await pickNextDrivable();
+    expect(picked).toBeUndefined();
+  });
+
+  it('pickNextDrivable still drives a fresh topic in another category while fear-greed is cooled', async () => {
+    await db().insert(articles).values({
+      keyword: 'crypto fear and greed index', category: 'analysis', status: 'published',
+      slug: 'fng-published-2', publishedAt: new Date(), siteId: xgSiteId,
+    });
+    await db().insert(articles).values({
+      keyword: 'fear and greed index today', category: 'analysis', status: 'pending', siteId: xgSiteId,
+    });
+    const [fresh] = await db().insert(articles).values({
+      keyword: 'rsi divergence crypto', category: 'indicators', status: 'pending', siteId: xgSiteId,
+    }).returning();
+    const picked = await pickNextDrivable();
+    expect(picked?.id).toBe(fresh.id);
+  });
+
+  it('pickNextDrivable honours excludeCategories (per-day category diversity)', async () => {
+    const [a] = await db().insert(articles).values({
+      keyword: 'rsi divergence crypto', category: 'indicators', status: 'pending',
+      createdAt: new Date('2026-04-23T13:00:00Z'), siteId: xgSiteId,
+    }).returning();
+    const [b] = await db().insert(articles).values({
+      keyword: 'bybit futures trading', category: 'exchanges', status: 'pending',
+      createdAt: new Date('2026-04-24T13:00:00Z'), siteId: xgSiteId,
+    }).returning();
+    const first = await pickNextDrivable();
+    expect(first?.id).toBe(a.id); // both never-published → oldest createdAt wins
+    const second = await pickNextDrivable([first!.id], [first!.category]);
+    expect(second?.id).toBe(b.id);
+    expect(second?.category).not.toBe(first?.category);
+  });
+
   it('pickNextDrivable picks bot pending again once the bot cluster cooldown has expired', async () => {
     // Bot was published 30 days ago — well outside the 14-day cooldown.
     const longAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);

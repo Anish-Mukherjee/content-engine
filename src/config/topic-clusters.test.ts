@@ -1,6 +1,6 @@
 // src/config/topic-clusters.test.ts
 import { describe, it, expect } from 'vitest';
-import { clusterTags, intersects } from './topic-clusters';
+import { clusterTags, intersects, saturationTags, UNIVERSAL_TOKENS } from './topic-clusters';
 
 describe('clusterTags', () => {
   it('tags every recent published "bot" article as bot cluster', () => {
@@ -87,5 +87,59 @@ describe('intersects', () => {
     expect(intersects(new Set(['bot']), new Set(['bot', 'bitcoin']))).toBe(true);
     expect(intersects(new Set(['rsi']), new Set(['bot']))).toBe(false);
     expect(intersects(new Set(), new Set(['bot']))).toBe(false);
+  });
+});
+
+describe('saturationTags', () => {
+  // The June 2026 incident: these all published back-to-back because clusterTags
+  // returned ∅ for every one of them. saturationTags must give them overlapping
+  // keys so the cooldown catches them.
+  const incidentKeywords = [
+    'bitcoinfear and greed index', 'crypto fear and greed index live', 'greed index crypto',
+    'fear and greed', 'fear and greed index today', 'crypto fear and greed',
+    'fear and greed index chart', 'market greed index', 'fear index crypto',
+  ];
+
+  it('INVARIANT: never returns an empty set for any keyword with a real token', () => {
+    for (const kw of incidentKeywords) {
+      expect(clusterTags(kw)).toEqual(new Set()); // precondition: these are clusterless
+      expect(saturationTags(kw).size).toBeGreaterThan(0); // but saturationTags still tags them
+    }
+    expect(saturationTags('crypto market analysis').size).toBeGreaterThan(0);
+    expect(saturationTags('crypto futures trading us').size).toBeGreaterThan(0);
+  });
+
+  it('gives fear-and-greed variants overlapping tags so cooldown suppresses them', () => {
+    // Publishing the first puts its tags on cooldown; every other variant must
+    // intersect that set and therefore be skipped.
+    const cooldown = saturationTags('fear and greed index');
+    for (const kw of incidentKeywords) {
+      expect(intersects(saturationTags(kw), cooldown)).toBe(true);
+    }
+  });
+
+  it('prefers curated clusters over the token fallback (no double-counting)', () => {
+    expect(saturationTags('bitcoin futures trading')).toEqual(new Set(['bitcoin']));
+    expect(saturationTags('btc futures strategy')).toEqual(new Set(['bitcoin']));
+    expect(saturationTags('crypto trading bot')).toEqual(new Set(['bot']));
+    expect(saturationTags('crypto margin trading')).toEqual(new Set(['leverage']));
+  });
+
+  it('falls back to salient (non-universal) tokens, prefixed kw:', () => {
+    expect(saturationTags('fear and greed index')).toEqual(new Set(['kw:fear', 'kw:greed', 'kw:index']));
+    // platform words are dropped from the fallback so the queue is not over-cooled
+    for (const t of saturationTags('fear and greed index')) {
+      expect(UNIVERSAL_TOKENS.has(t.replace('kw:', ''))).toBe(false);
+    }
+  });
+
+  it('keeps genuinely different topics from colliding', () => {
+    expect(intersects(saturationTags('fear and greed index'), saturationTags('crypto scalping strategy'))).toBe(false);
+    expect(intersects(saturationTags('crypto fear index'), saturationTags('bitcoin futures trading'))).toBe(false);
+  });
+
+  it('still returns a non-empty key when every token is universal or the signature is empty', () => {
+    expect(saturationTags('crypto futures trading').size).toBeGreaterThan(0); // all-universal
+    expect(saturationTags('best of the')).toEqual(new Set(['kw:sigless'])); // all stop-words
   });
 });

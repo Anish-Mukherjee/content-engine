@@ -20,7 +20,7 @@ import 'dotenv/config';
 import { and, eq, gte, inArray, sql } from 'drizzle-orm';
 import { pathToFileURL } from 'node:url';
 
-import { CLUSTER_COOLDOWN_DAYS, clusterTags, intersects } from '../src/config/topic-clusters';
+import { CLUSTER_COOLDOWN_DAYS, saturationTags, intersects } from '../src/config/topic-clusters';
 import { db, closeDb } from '../src/db/client';
 import { articles } from '../src/db/schema';
 import { signature } from '../src/lib/keyword-signature';
@@ -157,7 +157,7 @@ export function buildDedupePlan(
   if (cooldownClusters && cooldownClusters.size > 0) {
     const survived: DedupePlan['keep'] = [];
     for (const k of plan.keep) {
-      const tags = clusterTags(k.keyword);
+      const tags = saturationTags(k.keyword);
       let cooldownHit: string | null = null;
       for (const t of tags) {
         if (cooldownClusters.has(t)) { cooldownHit = t; break; }
@@ -203,7 +203,7 @@ export async function dedupeActive(opts: { apply: boolean; scope?: DedupeScope }
     .orderBy(sql`${articles.publishedAt} DESC`);
   const cooldownClusters = new Map<string, string>();
   for (const r of recent) {
-    for (const t of clusterTags(r.keyword)) {
+    for (const t of saturationTags(r.keyword)) {
       if (!cooldownClusters.has(t)) cooldownClusters.set(t, r.keyword); // most-recent wins via DESC order
     }
   }

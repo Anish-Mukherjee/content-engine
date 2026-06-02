@@ -108,3 +108,56 @@ export function intersects(tags: Set<string>, cooldown: ReadonlySet<string>): bo
   for (const t of tags) if (cooldown.has(t)) return true;
   return false;
 }
+
+// ─────────────────────────────────────────────────────────────────
+// saturationTags — the cooldown key used by EVERY saturation guard.
+//
+// clusterTags is an ALLOWLIST: it only tags keywords whose signature contains
+// a hand-listed anchor. Any topic nobody thought to add (fear & greed,
+// sentiment, ETF, halving, …) gets an EMPTY set → it becomes invisible to the
+// cooldown system and can publish back-to-back forever. That allowlist gap is
+// exactly what let "fear and greed index" dominate the feed (June 2026
+// incident) — and why the same class of bug recurred after the May 2026 fix,
+// which had hard-listed only the topics saturating then (trading bots).
+//
+// saturationTags closes the gap by DERIVING a key from the keyword itself when
+// no curated cluster matches: it falls back to the signature's salient
+// (non-universal) tokens. So publishing "fear and greed index" now contributes
+// {kw:fear, kw:greed, kw:index}; the next "crypto fear and greed" shares
+// {kw:fear, kw:greed} and is correctly suppressed. No topic can ever be
+// cooldown-invisible again.
+//
+// INVARIANT: saturationTags(kw) is NEVER empty for any keyword. Curated
+// clusters still win where they exist (so "BTC futures" and "bitcoin futures"
+// still collapse via the bitcoin cluster). Every cooldown callsite
+// (getCooldownClusters, pickNextDrivable, harvest Pass 2c, dedupe-pending)
+// MUST use this function, not clusterTags — a split would let a row survive one
+// filter while being skipped by another and loop in the queue forever.
+//
+// UNIVERSAL_TOKENS are platform words that appear in nearly every keyword and
+// carry no topical meaning. They are excluded from the fallback so we don't put
+// the entire queue on cooldown. This list is the one residual allowlist; keep
+// it SMALL and review it against production keyword frequency periodically.
+export const UNIVERSAL_TOKENS = new Set<string>([
+  'crypto', 'future', 'trade', 'market', 'price',
+  'platform', 'exchange', 'contract', 'coin', 'fee',
+]);
+
+export function saturationTags(keyword: string): Set<string> {
+  // 1) Curated clusters win — they encode real synonym knowledge (btc↔bitcoin,
+  //    margin↔leverage) that token-level fallback can't.
+  const curated = clusterTags(keyword);
+  if (curated.size > 0) return curated;
+
+  // 2) Fallback: salient signature tokens. Prefixed with "kw:" so the ad-hoc
+  //    keys never collide with curated cluster names.
+  const sig = signature(keyword);
+  if (!sig) return new Set(['kw:sigless']); // all-stop-word keyword (degenerate)
+  const salient = sig.split(' ').filter((t) => t && !UNIVERSAL_TOKENS.has(t));
+  if (salient.length > 0) return new Set(salient.map((t) => `kw:${t}`));
+
+  // 3) Every token was universal (e.g. "crypto futures trade"): key on the
+  //    whole signature so identical platform topics still collide, but distinct
+  //    ones don't. Never empty.
+  return new Set([`kw:${sig.replace(/ /g, '_')}`]);
+}

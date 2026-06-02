@@ -10,7 +10,7 @@ import { articles, dataforseoTasks, keywordResults, seedKeywords } from '../db/s
 import { checkRelevance } from '../integrations/claude';
 import { fetchTaskResult } from '../integrations/dataforseo';
 import { signature } from '../lib/keyword-signature';
-import { CLUSTER_COOLDOWN_DAYS, clusterTags, intersects } from '../config/topic-clusters';
+import { CLUSTER_COOLDOWN_DAYS, saturationTags, intersects } from '../config/topic-clusters';
 import { logger } from '../lib/logger';
 
 const RELEVANCE_BATCH_SIZE = 20;
@@ -175,11 +175,11 @@ async function applyClusterCooldownFilter(ids: string[]) {
     .where(and(eq(articles.status, 'published'), gte(articles.publishedAt, cutoff)));
 
   const cooldown = new Set<string>();
-  for (const r of recent) for (const t of clusterTags(r.keyword)) cooldown.add(t);
+  for (const r of recent) for (const t of saturationTags(r.keyword)) cooldown.add(t);
   if (cooldown.size === 0) return;
 
   for (const c of candidates) {
-    if (intersects(clusterTags(c.keyword), cooldown)) {
+    if (intersects(saturationTags(c.keyword), cooldown)) {
       await db()
         .update(keywordResults)
         .set({

@@ -2,6 +2,13 @@
 import type { ArticleOutline } from '../integrations/claude/types';
 import type { BrandConfig } from './brand';
 
+// Models default to their training-cutoff year when a title or intro needs one
+// ("... Guide 2025" shipped on 2026-09-09). Every generation prompt states the date.
+export function todayLine(now: Date = new Date()): string {
+  const iso = now.toISOString().slice(0, 10);
+  return `Today is ${iso}. When you mention a year, month, "this year", "current", "latest" or "now", use ${iso.slice(0, 4)} — never an earlier year.`;
+}
+
 export function perplexityResearchSystem(_brand: BrandConfig): string {
   return `You are a senior SEO content strategist.
 Your job is to research the top ranking articles for a keyword, analyze them critically,
@@ -11,7 +18,9 @@ No explanation, no markdown, no backticks.`;
 }
 
 export function perplexityResearchUser(keyword: string): string {
-  return `Research the top 3 ranking articles on Google for this keyword: "${keyword}"
+  return `${todayLine()}
+
+Research the top 3 ranking articles on Google for this keyword: "${keyword}"
 
 For each of the top 3 articles analyze:
 - Their title and URL
@@ -135,7 +144,9 @@ export function claudeOutlineUser(params: {
   };
 }): string {
   const { keyword, searchVolume, brief } = params;
-  return `Create a complete article outline for this topic.
+  return `${todayLine()}
+
+Create a complete article outline for this topic.
 
 Keyword: ${keyword}
 Search volume: ${searchVolume ?? 'unknown'}
@@ -379,7 +390,9 @@ export function claudeArticleUser(params: {
     })
     .join('\n\n');
 
-  return `Write a complete article that beats the top 3 ranking competitors on Google for this keyword.
+  return `${todayLine()}
+
+Write a complete article that beats the top 3 ranking competitors on Google for this keyword.
 
 PRIMARY KEYWORD: ${keyword}
 TARGET WORD COUNT: ${wordCount}

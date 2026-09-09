@@ -74,7 +74,7 @@ export async function downloadAndCrop(
 export function getFallbackImage(category: Category, altText?: string): LocalImage {
   return {
     url: `/images/fallbacks/${category}.jpg`,
-    altText: altText || `${category} crypto futures`,
+    altText: altText || `${category} meme coin trading`,
     width: HERO_WIDTH,
     height: HERO_HEIGHT,
     photographerName: null,

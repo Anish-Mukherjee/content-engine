@@ -32,6 +32,19 @@ const PHRASE_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\bdouble\s+bottom\b/gi, 'doublebottom'],
   // Note: trailing 's' would be stripped by lemma(), so use the singular form.
   [/\bhead\s+and\s+shoulders\b/gi, 'headshoulder'],
+  // Meme-coin niche: product names and two-word concepts that read as one topic.
+  [/\bpump\s*\.?\s*fun\b/gi, 'pumpfun'],
+  [/\bpump\s*swap\b/gi, 'pumpswap'],
+  [/\bmeme\s*coins?\b/gi, 'memecoin'],
+  [/\bcopy\s*trad(?:e|es|ing)\b/gi, 'copytrade'],
+  [/\brug\s*pulls?\b/gi, 'rugpull'],
+  [/\bsmart\s*money\b/gi, 'smartmoney'],
+  [/\bmarket\s*cap(?:italization)?\b/gi, 'mcap'],
+  [/\bbanana\s*gun\b/gi, 'bananagun'],
+  [/\bbonk\s*bot\b/gi, 'bonkbot'],
+  [/\bgmgn\.ai\b/gi, 'gmgn'],
+  [/\bdog\s*wif\s*hat\b/gi, 'dogwifhat'],
+  [/\bwallet'?s\b/gi, 'wallet'],
 ];
 
 // Single-token aliases applied after tokenisation. Maps surface form → canonical.
@@ -84,6 +97,10 @@ const ALIASES: Record<string, string> = {
   // Tickers → coin names (so e.g. "BTC futures" matches "bitcoin futures")
   btc: 'bitcoin',
   eth: 'ethereum',
+  wif: 'dogwifhat',
+  shiba: 'shib',
+  snipe: 'sniper',
+  sniping: 'sniper',
   ether: 'ethereum',
   sol: 'solana',
   bnb: 'binancecoin',

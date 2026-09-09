@@ -25,6 +25,18 @@ describe('importSeedKeywords', () => {
     expect(rows.map((r) => r.keyword).sort()).toEqual(['bar', 'baz', 'foo']);
   });
 
+  it('accepts the flat [{keyword, category}] shape of the meme-coin seed file', async () => {
+    const payload = [
+      { keyword: 'Pump.fun trading', category: 'platforms' },
+      { keyword: 'crypto KOL calls', category: 'kols' },
+      { keyword: 'Pump.fun trading', category: 'platforms' },
+    ];
+    await importSeedKeywords(payload);
+    const rows = await db().select().from(seedKeywords);
+    expect(rows).toHaveLength(2);
+    expect(rows.find((r) => r.keyword === 'crypto KOL calls')?.category).toBe('kols');
+  });
+
   it('is idempotent — re-running does not duplicate', async () => {
     const payload = { exchanges: ['foo'] };
     await importSeedKeywords(payload);

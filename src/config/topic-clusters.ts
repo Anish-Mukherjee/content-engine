@@ -72,7 +72,6 @@ export const TOPIC_CLUSTERS: Record<string, string[]> = {
   // from publishing back to back)
   bitcoin: ['bitcoin'],
   ethereum: ['ethereum'],
-  solana: ['solana'],
   binancecoin: ['binancecoin'],
   ripple: ['ripple'],
   dogecoin: ['dogecoin'],
@@ -82,6 +81,56 @@ export const TOPIC_CLUSTERS: Record<string, string[]> = {
   polkadot: ['polkadot'],
   polygon: ['polygon'],
   litecoin: ['litecoin'],
+
+  // ── Meme-coin niche (2026-09) ─────────────────────────────────
+  // Launchpad / venue
+  pumpfun: ['pumpfun', 'pumpswap'],
+  raydium: ['raydium'],
+  jupiter: ['jupiter'],
+  meteora: ['meteora'],
+  moonshot: ['moonshot'],
+  uniswap: ['uniswap'],
+  robinhood: ['robinhood'],
+
+  // Terminals, bots, scanners (each its own product review cluster)
+  bullx: ['bullx'],
+  photon: ['photon'],
+  gmgn: ['gmgn'],
+  axiom: ['axiom'],
+  bonkbot: ['bonkbot'],
+  trojan: ['trojan'],
+  maestro: ['maestro'],
+  bananagun: ['bananagun'],
+  dexscreener: ['dexscreener'],
+  birdeye: ['birdeye'],
+  dextools: ['dextools'],
+  solscan: ['solscan'],
+
+  // People / signal sources
+  kol: ['kol', 'caller', 'influencer', 'alpha'],
+  smartmoney: ['smartmoney', 'whale', 'insider'],
+
+  // Execution styles
+  copytrade: ['copytrade', 'copy'],
+  sniper: ['sniper'],
+
+  // Safety
+  rug: ['rug', 'rugpull', 'honeypot', 'scam', 'drainer'],
+
+  // Mechanics
+  bondingcurve: ['bonding'],
+  migration: ['migration', 'migrate'],
+
+  // Meme coins (each its own cluster)
+  pepe: ['pepe'],
+  bonk: ['bonk'],
+  dogwifhat: ['dogwifhat'],
+  shib: ['shib'],
+  popcat: ['popcat'],
+  fartcoin: ['fartcoin'],
+  brett: ['brett'],
+  floki: ['floki'],
+  trump: ['trump'],
 };
 
 // Reverse index: anchor-token → cluster-name. Built once at module load.
@@ -141,6 +190,9 @@ export function intersects(tags: Set<string>, cooldown: ReadonlySet<string>): bo
 export const UNIVERSAL_TOKENS = new Set<string>([
   'crypto', 'future', 'trade', 'market', 'price',
   'platform', 'exchange', 'contract', 'coin', 'fee',
+  // Meme-coin niche: the platform IS meme coins on Solana — these appear in
+  // most keywords and carry no topical meaning on their own.
+  'meme', 'memecoin', 'token', 'solana',
 ]);
 
 export function saturationTags(keyword: string): Set<string> {

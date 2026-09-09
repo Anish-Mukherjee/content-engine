@@ -4,7 +4,7 @@ import { and, count, desc, eq, ilike, or, type SQL } from 'drizzle-orm';
 
 import { db } from '../../db/client';
 import { articles } from '../../db/schema';
-import { isCategory } from '../../config/categories';
+import { isKnownCategory } from '../../config/categories';
 
 export const articlesRouter = Router();
 
@@ -32,7 +32,7 @@ articlesRouter.get('/api/articles', async (req, res) => {
   const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
   const offset = (page - 1) * limit;
 
-  const category = typeof req.query.category === 'string' && isCategory(req.query.category)
+  const category = typeof req.query.category === 'string' && isKnownCategory(req.query.category)
     ? req.query.category
     : null;
 

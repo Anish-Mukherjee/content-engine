@@ -101,4 +101,17 @@ describe('keyword signature', () => {
     expect(signature('crypto address')).not.toBe(signature('crypto addres'));
     expect(signature('crypto bonus')).not.toBe(signature('crypto bonu'));
   });
+
+  it('collapses meme-coin phrases and product names to one canonical token', () => {
+    expect(signature('Pump.fun trading')).toBe(signature('pumpfun trade'));
+    expect(signature('pump fun bonding curve')).toBe(signature('pump.fun bonding curve'));
+    expect(signature('meme coin copy trading')).toBe(signature('memecoin copytrade'));
+    expect(signature('best meme coins to buy')).toBe(signature('memecoin buy'));
+    expect(signature('how to spot a rug pull')).toBe(signature('spot rugpull'));
+    expect(signature('smart money wallets crypto')).toBe(signature('smartmoney wallet crypto'));
+    expect(signature('WIF dogwifhat')).toBe(signature('dogwifhat'));
+    expect(signature('Banana Gun bot')).toBe(signature('bananagun bot'));
+    expect(signature('crypto KOL calls')).toBe(signature('kol call crypto'));
+    expect(signature('best crypto KOLs to follow')).toBe(signature('kol follow crypto'));
+  });
 });

@@ -254,7 +254,7 @@ describe('fetchInlineCandidates', () => {
   });
 
   describe('category-aware source routing', () => {
-    it('exchanges category puts local-press-kit first then wikimedia, unsplash, pexels, pixabay, freepik', async () => {
+    it('platforms category puts local-press-kit first then wikimedia, unsplash, pexels, pixabay, freepik', async () => {
       (findLocalPressKitCandidates as unknown as vi.Mock).mockResolvedValueOnce([
         { sourceId: 'bybit/1.jpg', inlineSource: { url: 'file:///x/1.jpg' } as any },
       ]);
@@ -274,7 +274,7 @@ describe('fetchInlineCandidates', () => {
         { sourceId: 'F', inlineSource: { url: 'fp' } as any },
       ]);
 
-      const out = await fetchInlineCandidates('Bybit perpetual interface', 'exchanges');
+      const out = await fetchInlineCandidates('Pump.fun bonding curve page', 'platforms');
       expect(out.map((c) => c.source)).toEqual([
         'local-press-kit', 'wikimedia', 'unsplash', 'pexels', 'pixabay', 'freepik',
       ]);
@@ -296,7 +296,7 @@ describe('fetchInlineCandidates', () => {
       expect(findLocalPressKitCandidates).not.toHaveBeenCalled();
     });
 
-    it('patterns category puts wikimedia first (technical-diagram bias)', async () => {
+    it('coins category puts wikimedia first (PD coin-logo bias)', async () => {
       (findWikimediaCandidates as unknown as vi.Mock).mockResolvedValueOnce([
         { sourceId: 'W', inlineSource: { url: 'wm' } as any },
       ]);
@@ -304,7 +304,7 @@ describe('fetchInlineCandidates', () => {
         { sourceId: 'U', inlineSource: { url: 'un' } as any },
       ]);
 
-      const out = await fetchInlineCandidates('doji candlestick reversal', 'patterns');
+      const out = await fetchInlineCandidates('dogecoin logo', 'coins');
       expect(out[0].source).toBe('wikimedia');
       expect(findLocalPressKitCandidates).not.toHaveBeenCalled();
     });

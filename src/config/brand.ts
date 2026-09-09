@@ -11,12 +11,14 @@ export type BrandConfig = {
 export const BRAND: BrandConfig = {
   name: 'XeroGravity',
   domain: 'xerogravity.com',
-  description: 'a crypto futures trading signals platform powered by AI',
+  description:
+    'a meme coin trading terminal that tracks KOL calls and smart-money wallets on Solana ' +
+    'and Robinhood chain in real time, with copy trading and autopilot execution',
   signupUrl: 'https://xerogravity.com/',
-  audience: 'active crypto futures traders',
+  audience: 'active meme coin traders',
   ctaHtml:
-    '<div class="xg-cta"><p>Scanning the market for setups like this manually takes hours. ' +
-    'XeroGravity does it automatically — AI-powered signals with entry, take profit, and stop ' +
-    'loss levels delivered to your dashboard in real time. ' +
+    '<div class="xg-cta"><p>Watching every KOL channel and smart-money wallet by hand is a full-time job. ' +
+    'XeroGravity does it for you — live KOL and wallet signals with win rates, one-click buys, ' +
+    'and autopilot with take profit and stop loss on Solana and Robinhood chain. ' +
     '<a href="https://xerogravity.com/">Start free.</a></p></div>',
 };

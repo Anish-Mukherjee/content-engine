@@ -61,6 +61,19 @@ describe('claude integration', () => {
     expect(call.model).toBe('claude-haiku-4-5-20251001');
   });
 
+  it('checkRelevance gives Claude room for a full-size batch and surfaces max_tokens truncation', async () => {
+    // 2026-09-09: a 100-keyword batch produced ~600 output tokens; max_tokens 500
+    // cut the JSON array mid-string and the batch died as "JSON parse failed".
+    createMock.mockResolvedValueOnce({
+      content: [{ type: 'text', text: '["YES","NO","YE' }],
+      stop_reason: 'max_tokens',
+    });
+    const many = Array.from({ length: 100 }, (_, i) => `keyword ${i}`);
+    await expect(checkRelevance(many, BRAND)).rejects.toThrow(/max_tokens/);
+    const call = createMock.mock.calls[0][0];
+    expect(call.max_tokens).toBeGreaterThanOrEqual(1500);
+  });
+
   it('generateOutline returns a parsed outline with required fields', async () => {
     const outline = {
       title: 'T', slug: 't', meta_title: 'T', meta_description: 'D',

@@ -18,7 +18,7 @@ const HERO = {
   isFallback: false, contentHash: 'h1',
 };
 const FALLBACK = {
-  url: '/images/fallbacks/exchanges.jpg', altText: '', width: 1200, height: 630,
+  url: '/images/fallbacks/platforms.jpg', altText: '', width: 1200, height: 630,
   photographerName: null, photographerUrl: null, unsplashId: null,
   isFallback: true, contentHash: null,
 };
@@ -33,7 +33,7 @@ describe('fetchImage', () => {
 
   it('fetches hero, leaves articleHtml untouched when no placeholders, advances to image_ready', async () => {
     const [a] = await db().insert(articles).values({
-      keyword: 'k', category: 'exchanges', status: 'written', slug: 'post-1',
+      keyword: 'k', category: 'platforms', status: 'written', slug: 'post-1',
       articleHtml: '<h2>Heading</h2><p>body</p>',
     }).returning();
     (pickUniqueHero as unknown as vi.Mock).mockResolvedValueOnce(HERO);
@@ -54,7 +54,7 @@ describe('fetchImage', () => {
       '<div class="inline-image-placeholder" data-query="bybit interface" data-caption="Bybit interface"></div>' +
       '<p>more</p>';
     const [a] = await db().insert(articles).values({
-      keyword: 'k', category: 'exchanges', status: 'written', slug: 'post-2',
+      keyword: 'k', category: 'platforms', status: 'written', slug: 'post-2',
       articleHtml: html,
     }).returning();
     (pickUniqueHero as unknown as vi.Mock).mockResolvedValueOnce(HERO);
@@ -74,7 +74,7 @@ describe('fetchImage', () => {
     expect(pickUniqueInline).toHaveBeenCalledWith({
       query: 'bybit interface', caption: 'Bybit interface',
       articleId: a.id, position: 1, filenameStem: 'post-2-inline-1',
-      category: 'exchanges',
+      category: 'platforms',
     });
   });
 
@@ -84,7 +84,7 @@ describe('fetchImage', () => {
       '<div class="inline-image-placeholder" data-query="no-results" data-caption="x"></div>' +
       '<p>outro</p>';
     const [a] = await db().insert(articles).values({
-      keyword: 'k', category: 'exchanges', status: 'written', slug: 'post-3',
+      keyword: 'k', category: 'platforms', status: 'written', slug: 'post-3',
       articleHtml: html,
     }).returning();
     (pickUniqueHero as unknown as vi.Mock).mockResolvedValueOnce(HERO);
@@ -104,7 +104,7 @@ describe('fetchImage', () => {
       '<h2>H</h2><p>i</p>' +
       '<div class="inline-image-placeholder" data-query="q" data-caption="c"></div>';
     const [a] = await db().insert(articles).values({
-      keyword: 'k', category: 'exchanges', status: 'written', slug: 'post-4',
+      keyword: 'k', category: 'platforms', status: 'written', slug: 'post-4',
       articleHtml: html,
     }).returning();
     (pickUniqueHero as unknown as vi.Mock).mockResolvedValueOnce(FALLBACK);
@@ -119,7 +119,7 @@ describe('fetchImage', () => {
 
   it('falls back when Unsplash returns null', async () => {
     const [a] = await db().insert(articles).values({
-      keyword: 'k', category: 'exchanges', status: 'written', slug: 'post-5',
+      keyword: 'k', category: 'platforms', status: 'written', slug: 'post-5',
       articleHtml: '<p>no placeholders</p>',
     }).returning();
     (pickUniqueHero as unknown as vi.Mock).mockResolvedValueOnce(FALLBACK);
@@ -134,7 +134,7 @@ describe('fetchImage', () => {
 
   it('falls back on hero integration error — never blocks pipeline', async () => {
     const [a] = await db().insert(articles).values({
-      keyword: 'k', category: 'exchanges', status: 'written', slug: 'post-6',
+      keyword: 'k', category: 'platforms', status: 'written', slug: 'post-6',
       articleHtml: '<p>x</p>',
     }).returning();
     (pickUniqueHero as unknown as vi.Mock).mockResolvedValueOnce(FALLBACK);
@@ -147,7 +147,7 @@ describe('fetchImage', () => {
 
   it('passes articleId + slug + filenameStem to pickUniqueHero', async () => {
     const [a] = await db().insert(articles).values({
-      keyword: 'k', category: 'indicators', status: 'written',
+      keyword: 'k', category: 'tools', status: 'written',
       slug: 'my-slug', title: 'My Title', articleHtml: '<p>hi</p>',
     }).returning();
     (pickUniqueHero as unknown as vi.Mock).mockResolvedValueOnce({
@@ -157,7 +157,7 @@ describe('fetchImage', () => {
     });
     await fetchImage(a.id);
     expect(pickUniqueHero).toHaveBeenCalledWith({
-      category: 'indicators', articleId: a.id, slug: 'my-slug',
+      category: 'tools', articleId: a.id, slug: 'my-slug',
       altText: 'My Title', filenameStem: 'my-slug-hero',
     });
   });

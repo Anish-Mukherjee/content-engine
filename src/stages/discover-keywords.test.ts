@@ -22,8 +22,8 @@ describe('discoverKeywords', () => {
 
   it('picks N seeds per category LRU, submits to DataForSEO, records task rows', async () => {
     // Seed a handful per category — enough to satisfy rotation counts
-    const cats = ['exchanges', 'patterns', 'indicators', 'concepts', 'strategies',
-                  'automation', 'risk', 'coins', 'education', 'analysis'];
+    const cats = ['platforms', 'tools', 'kols', 'wallets', 'automation', 'concepts',
+                  'strategies', 'risk', 'chains', 'coins', 'education', 'analysis'];
     for (const cat of cats) {
       for (let i = 0; i < 3; i++) {
         await db().insert(seedKeywords).values({ keyword: `${cat}-${i}`, category: cat });
@@ -44,8 +44,8 @@ describe('discoverKeywords', () => {
   });
 
   it('takes what is available when a category is under-seeded', async () => {
-    // Only one "exchanges" seed, rotation asks for 3 — should warn and submit just 1 for that category
-    await db().insert(seedKeywords).values({ keyword: 'only-one', category: 'exchanges' });
+    // Only one "platforms" seed, rotation asks for 3 — should warn and submit just 1 for that category
+    await db().insert(seedKeywords).values({ keyword: 'only-one', category: 'platforms' });
     (submitKeywordTask as unknown as vi.Mock).mockImplementation(async (kw: string) =>
       ({ externalTaskId: `task-${kw}` }));
 

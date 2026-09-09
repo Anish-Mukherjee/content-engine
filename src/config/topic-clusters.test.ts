@@ -33,7 +33,8 @@ describe('clusterTags', () => {
     expect(clusterTags('btc futures strategy')).toContain('bitcoin'); // btc → bitcoin via alias
     expect(clusterTags('ethereum futures analysis')).toContain('ethereum');
     expect(clusterTags('eth futures trading')).toContain('ethereum');
-    expect(clusterTags('solana futures')).toContain('solana');
+    // solana is the home chain now — universal, never a cluster on its own
+    expect(clusterTags('solana futures')).toEqual(new Set());
   });
 
   it('tags exchange-specific keywords with the exchange cluster', () => {
@@ -141,5 +142,70 @@ describe('saturationTags', () => {
   it('still returns a non-empty key when every token is universal or the signature is empty', () => {
     expect(saturationTags('crypto futures trading').size).toBeGreaterThan(0); // all-universal
     expect(saturationTags('best of the')).toEqual(new Set(['kw:sigless'])); // all stop-words
+  });
+});
+
+describe('meme-coin clusters', () => {
+  it('tags Pump.fun / PumpSwap topics as one cluster', () => {
+    expect(clusterTags('Pump.fun trading')).toContain('pumpfun');
+    expect(clusterTags('pump.fun bonding curve')).toContain('pumpfun');
+    expect(clusterTags('PumpSwap vs Raydium')).toContain('pumpfun');
+    expect(clusterTags('Pump.fun sniper bot')).toContain('pumpfun');
+  });
+
+  it('tags rug / honeypot / scam safety topics as one cluster', () => {
+    expect(clusterTags('how to spot a rug pull')).toContain('rug');
+    expect(clusterTags('rug pull crypto explained')).toContain('rug');
+    expect(clusterTags('honeypot token detection')).toContain('rug');
+    expect(clusterTags('meme coin scams to avoid')).toContain('rug');
+    expect(clusterTags('crypto wallet drainer')).toContain('rug');
+  });
+
+  it('tags KOL / caller / alpha-group topics as one cluster', () => {
+    expect(clusterTags('crypto KOL calls')).toContain('kol');
+    expect(clusterTags('best meme coin callers')).toContain('kol');
+    expect(clusterTags('crypto alpha groups')).toContain('kol');
+    expect(clusterTags('crypto influencer trading calls')).toContain('kol');
+  });
+
+  it('tags smart-money / whale / insider wallet topics as one cluster', () => {
+    expect(clusterTags('smart money wallets crypto')).toContain('smartmoney');
+    expect(clusterTags('whale wallet tracking')).toContain('smartmoney');
+    expect(clusterTags('insider wallet tracking crypto')).toContain('smartmoney');
+  });
+
+  it('tags copy-trading and sniping as their own clusters', () => {
+    expect(clusterTags('meme coin copy trading')).toContain('copytrade');
+    expect(clusterTags('copy trading Solana')).toContain('copytrade');
+    expect(clusterTags("how to copy a wallet's trades")).toContain('copytrade');
+    expect(clusterTags('how to snipe new tokens')).toContain('sniper');
+    expect(clusterTags('meme coin sniper bot')).toContain('sniper');
+  });
+
+  it('tags trading terminals / bots / scanners by product', () => {
+    expect(clusterTags('BullX review')).toContain('bullx');
+    expect(clusterTags('BullX vs Photon')).toContain('photon');
+    expect(clusterTags('GMGN.ai review')).toContain('gmgn');
+    expect(clusterTags('Axiom trading platform')).toContain('axiom');
+    expect(clusterTags('how to use Dexscreener')).toContain('dexscreener');
+    expect(clusterTags('Bonkbot guide')).toContain('bonkbot');
+    expect(clusterTags('Banana Gun bot')).toContain('bananagun');
+  });
+
+  it('tags each meme coin as its own cluster', () => {
+    expect(clusterTags('PEPE coin trading')).toContain('pepe');
+    expect(clusterTags('BONK coin trading')).toContain('bonk');
+    expect(clusterTags('WIF dogwifhat')).toContain('dogwifhat');
+    expect(clusterTags('SHIB trading')).toContain('shib');
+    expect(clusterTags('DOGE trading')).toContain('dogecoin');
+    expect(clusterTags('FARTCOIN trading')).toContain('fartcoin');
+    expect(clusterTags('TRUMP coin trading')).toContain('trump');
+  });
+
+  it('never keys the whole queue on "meme coin" / "token" / "solana"', () => {
+    for (const t of ['meme', 'memecoin', 'token', 'solana']) expect(UNIVERSAL_TOKENS.has(t)).toBe(true);
+    expect(saturationTags('what is a meme coin')).toEqual(new Set(['kw:memecoin']));
+    expect(saturationTags('Solana meme coins')).toEqual(new Set(['kw:memecoin_solana']));
+    expect(saturationTags('meme coin liquidity explained')).toEqual(new Set(['kw:liquidity', 'kw:explained']));
   });
 });

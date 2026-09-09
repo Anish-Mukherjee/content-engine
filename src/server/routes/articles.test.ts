@@ -57,14 +57,21 @@ describe('articles routes', () => {
       { keyword: 'a', category: 'exchanges', status: 'published', slug: 'a', publishedAt: new Date() },
       { keyword: 'b', category: 'funding-rates', status: 'published', slug: 'b', publishedAt: new Date() },
     ]);
+    // 'exchanges' is a retired category: published legacy rows must stay filterable
     const valid = await request(app).get('/api/articles?category=exchanges');
     expect(valid.status).toBe(200);
     expect(valid.body.articles).toHaveLength(1);
     expect(valid.body.articles[0].slug).toBe('a');
 
+    await db().insert(articles).values(
+      { keyword: 'c', category: 'platforms', status: 'published', slug: 'c', publishedAt: new Date() },
+    );
+    const live = await request(app).get('/api/articles?category=platforms');
+    expect(live.body.articles.map((r: { slug: string }) => r.slug)).toEqual(['c']);
+
     const invalid = await request(app).get('/api/articles?category=not-a-category');
     expect(invalid.status).toBe(200);
-    expect(invalid.body.articles).toHaveLength(2);  // falls back to all published
+    expect(invalid.body.articles).toHaveLength(3);  // falls back to all published
   });
 
   it('GET /api/articles with non-numeric pagination params returns 200 with defaults', async () => {

@@ -245,8 +245,9 @@ CREDIBILITY SIGNALS:
   e.g. "According to DexScreener data, the token did $12 million in 24-hour volume on its migration day"
   e.g. "CoinGecko data shows BONK's market cap peaked at $3.2 billion in November 2024"
   e.g. "Pump.fun's official documentation confirms the swap fee sits at 1%"
-- Where relevant, link to ${brand.name}'s live signals feed naturally in the article body:
-  e.g. "${brand.name} flagged this wallet's first buy 40 seconds after it landed — <a href='https://${brand.domain}/signals'>see live KOL and wallet signals here</a>"
+- Where relevant, link to ${brand.name}'s live signals feed or KOL leaderboard naturally in the article body:
+  e.g. "${brand.name} flagged this wallet's first buy 40 seconds after it landed — <a href='https://${brand.domain}/'>see live KOL and wallet signals here</a>"
+  e.g. "You can check any caller's real win rate on the <a href='https://${brand.domain}/leaderboard'>${brand.name} KOL leaderboard</a>"
 - Only include data points that are verifiable and realistic — never invent statistics
 
 SPECIAL CONTENT BLOCKS — use these where relevant:

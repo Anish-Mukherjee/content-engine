@@ -24,10 +24,13 @@ export async function checkRelevance(
 ): Promise<boolean[]> {
   const resp = await anthropic().messages.create({
     model: MODELS.relevance,
-    max_tokens: 500,
+    max_tokens: 1500,
     system: claudeRelevanceSystem(brand),
     messages: [{ role: 'user', content: claudeRelevanceUser(keywords) }],
   });
+  if (resp.stop_reason === 'max_tokens') {
+    throw new TerminalError('claude relevance: response truncated by max_tokens — bump the limit');
+  }
   const text = extractText(resp);
   const arr = tryJson(text);
   if (!Array.isArray(arr)) {
@@ -126,7 +129,9 @@ function tryJson(raw: string): unknown {
   try {
     return JSON.parse(cleaned);
   } catch {
-    throw new TerminalError('claude: JSON parse failed');
+    // Include the head of the reply so the log says WHAT came back, not just that
+    // it was not JSON (a refusal, prose, an empty string, …).
+    throw new TerminalError(`claude: JSON parse failed: ${JSON.stringify(raw.slice(0, 200))}`);
   }
 }
 
